@@ -50,16 +50,22 @@ async function initAuth() {
 function setUser(user) {
     currentUser = user;
     const nav = document.getElementById('navActions');
+    
+    // زر المساعد الفني عبر الواتساب برقمك الخاص
+    const supportBtn = `<button class="nav-btn" onclick="window.open('https://wa.me/9647725372995', '_blank')" title="المساعد الفني"><i class="fab fa-whatsapp"></i> المساعد</button>`;
+
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
         const isAdmin = user.email === '2004oopp202326@gmail.com';
-        nav.innerHTML = `<button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
+        nav.innerHTML = `${supportBtn}
+                         <button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
                          ${isAdmin ? `<button class="nav-btn nav-btn-login" onclick="showPage('admin')"><i class="fas fa-cog"></i> الإدارة</button>` : ''}
                          <button class="nav-btn nav-btn-cart" onclick="toggleCart()"><i class="fas fa-shopping-cart"></i> <span class="cart-count" id="cartCount">0</span></button>`;
         loadWishlist(); loadAddresses();
     } else {
         userWishlistIds = []; userAddresses = [];
-        nav.innerHTML = `<button class="nav-btn nav-btn-login" onclick="showPage('auth')">دخول</button>
+        nav.innerHTML = `${supportBtn}
+                         <button class="nav-btn nav-btn-login" onclick="showPage('auth')">دخول</button>
                          <button class="nav-btn nav-btn-cart" onclick="toggleCart()"><i class="fas fa-shopping-cart"></i> <span class="cart-count" id="cartCount">0</span></button>`;
     }
     updateCartUI();
@@ -323,7 +329,7 @@ async function submitOrder(e) {
         customer_name: document.getElementById('orderName').value, 
         customer_phone: document.getElementById('orderPhone').value, 
         customer_address: document.getElementById('orderAddress').value, 
-        customer_city: 'نينوى', // حقل المدينة الافتراضي لتجنب خطأ الـ not-null constraint[span_2](start_span)[span_2](end_span)
+        customer_city: 'نينوى',
         coupon_used: appliedCouponCode,
         delivery_cost: 0,
         delivery_time: 'قيد التحديد'
