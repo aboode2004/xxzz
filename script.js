@@ -1,4 +1,4 @@
-const SUPABASE_URL = 'https://mixtajmjaitfcqsvflgl.supabase.co';
+hereconst SUPABASE_URL = 'https://mixtajmjaitfcqsvflgl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_-y-8QOaGJ6RzC4UxeG5ATw_LxVZByAo';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -7,6 +7,7 @@ let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let recentViews = JSON.parse(localStorage.getItem('recentViews') || '[]');
 let activeProductId = null, modalQty = 1, appliedDiscountAmount = 0, appliedCouponCode = "";
 let previousOrderCount = 0;
+let tempEmailForOtp = "";
 
 function playOrderSound() {
     try {
@@ -51,8 +52,8 @@ function setUser(user) {
     currentUser = user;
     const nav = document.getElementById('navActions');
     
-    // زر المساعد الفني عبر الواتساب برقمك الخاص
-    const supportBtn = `<button class="nav-btn" onclick="window.open('https://wa.me/9647725372995', '_blank')" title="المساعد الفني"><i class="fab fa-whatsapp"></i> المساعد</button>`;
+    // زر تواصل مع الدعم الفني في الأعلى
+    const supportBtn = `<button class="nav-btn" onclick="window.open('https://wa.me/9647725372995', '_blank')" title="تواصل مع الدعم الفني"><i class="fab fa-whatsapp"></i> تواصل مع الدعم الفني</button>`;
 
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
@@ -78,11 +79,59 @@ function switchAuthTab(t) {
     document.getElementById('formSignup').classList.toggle('hidden', t !== 'signup');
 }
 
+async function sendEmailOTP(email) {
+    tempEmailForOtp = email;
+    const { error } = await db.auth.signInWithOtp({ email: email });
+    if (error) {
+        showToast('خطأ في إرسال الرمز: ' + error.message, 'error');
+        return false;
+    } else {
+        showToast('تم إرسال رمز التأكيد إلى بريدك الإلكتروني 📩');
+        return true;
+    }
+}
+
+async function verifyEmailOTP(tokenCode) {
+    const { data, error } = await db.auth.verifyOtp({
+        email: tempEmailForOtp,
+        token: tokenCode,
+        type: 'email'
+    });
+
+    if (error) {
+        showToast('رمز التأكيد غير صحيح أو انتهت صلاحيته', 'error');
+    } else {
+        showToast('تم تسجيل الدخول بنجاح! 🎉');
+        setUser(data.user);
+        showPage('home');
+    }
+}
+
 async function handleLogin(e) {
-    e.preventDefault(); const btn = document.getElementById('btnLogin'); btn.disabled = true; btn.textContent = 'جاري...';
-    const { error } = await db.auth.signInWithPassword({ email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value });
-    if (error) { showToast('خطأ: ' + (error.message === 'Invalid login credentials' ? 'البريد أو كلمة المرور غير صحيحة' : error.message), 'error'); btn.disabled = false; btn.textContent = 'دخول'; } 
-    else { showToast('مرحباً!'); showPage('home'); }
+    e.preventDefault(); 
+    const btn = document.getElementById('btnLogin'); 
+    btn.disabled = true; 
+    btn.textContent = 'جاري...';
+    
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    if (!password) {
+        await sendEmailOTP(email);
+        btn.disabled = false; 
+        btn.textContent = 'دخول';
+        return;
+    }
+
+    const { error } = await db.auth.signInWithPassword({ email: email, password: password });
+    if (error) { 
+        showToast('خطأ: ' + (error.message === 'Invalid login credentials' ? 'البريد أو كلمة المرور غير صحيحة' : error.message), 'error'); 
+        btn.disabled = false; 
+        btn.textContent = 'دخول'; 
+    } else { 
+        showToast('مرحباً!'); 
+        showPage('home'); 
+    }
 }
 
 function generateUsername(name) {
@@ -322,6 +371,7 @@ async function submitOrder(e) {
     let dv = 0; if(appliedDiscountAmount < 1 && appliedDiscountAmount > 0) dv = subtotal * appliedDiscountAmount; else dv = appliedDiscountAmount;
     let ft = subtotal - dv; if(ft < 0) ft = 0;
     
+    // إرسال الطلب مع حفظ المنتجات (السلة) ليتمكن المدير من معرفتها
     const { data, error } = await db.from('orders').insert([{ 
         user_id: currentUser.id, 
         total: ft, 
@@ -332,7 +382,8 @@ async function submitOrder(e) {
         customer_city: 'نينوى',
         coupon_used: appliedCouponCode,
         delivery_cost: 0,
-        delivery_time: 'قيد التحديد'
+        delivery_time: 'قيد التحديد',
+        items: cart // حفظ المنتجات المطلوبة هنا
     }]).select();
     
     if (error) { showToast(error.message, 'error'); btn.disabled = false; } 
@@ -470,7 +521,24 @@ function renderAdminOrders() {
             actions = `<button onclick="printShippingLabel(${o.id})" class="btn-edit" style="background:var(--purple-dark);"><i class="fas fa-print"></i> طباعة البوليصة</button>
                        <span style="color:var(--green); font-size:0.8rem; margin-right:5px;">مكتمل</span>`;
         }
-        return `<div class="order-card"><div class="order-header"><span>#${o.id}</span><span>المجموع: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</span></div><div class="order-details"><div><b>الزبون:</b> ${o.customer_name} - ${o.customer_phone}</div><div><b>العنوان:</b> ${o.customer_address}</div><div><b>التوصيل:</b> ${o.delivery_cost ? o.delivery_cost + ' د.ع (' + o.delivery_time + ')' : 'لم يحدد بعد'}</div></div><div class="order-actions">${actions}</div></div>`;
+
+        // عرض تفاصيل المنتجات المطلوبة (مثل سماعات لينوفو وغيرها) للإدارة
+        let itemsHtml = '';
+        if (o.items && Array.isArray(o.items) && o.items.length > 0) {
+            itemsHtml = `<div style="margin: 8px 0; background: var(--light); padding: 8px; border-radius: 6px;">
+                <b style="font-size:0.85rem; color:var(--primary);">📦 المنتجات المطلوبة للشحن:</b>
+                <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+                    ${o.items.map(item => `
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                            <span>${item.icon || '🛍️'}</span>
+                            <span><b>${item.name}</b> (الكمية: ${item.qty})</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }
+
+        return `<div class="order-card"><div class="order-header"><span>#${o.id}</span><span>المجموع: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</span></div><div class="order-details"><div><b>الزبون:</b> ${o.customer_name} - ${o.customer_phone}</div><div><b>العنوان:</b> ${o.customer_address}</div>${itemsHtml}<div><b>التوصيل:</b> ${o.delivery_cost ? o.delivery_cost + ' د.ع (' + o.delivery_time + ')' : 'لم يحدد بعد'}</div></div><div class="order-actions">${actions}</div></div>`;
     }).join('');
 }
 
