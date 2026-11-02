@@ -323,6 +323,7 @@ async function submitOrder(e) {
         customer_name: document.getElementById('orderName').value, 
         customer_phone: document.getElementById('orderPhone').value, 
         customer_address: document.getElementById('orderAddress').value, 
+        customer_city: 'نينوى', // حقل المدينة الافتراضي لتجنب خطأ الـ not-null constraint[span_2](start_span)[span_2](end_span)
         coupon_used: appliedCouponCode,
         delivery_cost: 0,
         delivery_time: 'قيد التحديد'
