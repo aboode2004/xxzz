@@ -1,4 +1,4 @@
-hereconst SUPABASE_URL = 'https://mixtajmjaitfcqsvflgl.supabase.co';
+const SUPABASE_URL = 'https://mixtajmjaitfcqsvflgl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_-y-8QOaGJ6RzC4UxeG5ATw_LxVZByAo';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -14,8 +14,8 @@ function playOrderSound() {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5 note
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
         osc.connect(gain);
@@ -50,22 +50,16 @@ async function initAuth() {
 function setUser(user) {
     currentUser = user;
     const nav = document.getElementById('navActions');
-    
-    // زر المساعد الفني عبر الواتساب برقمك الخاص
-    const supportBtn = `<button class="nav-btn" onclick="window.open('https://wa.me/9647725372995', '_blank')" title="المساعد الفني"><i class="fab fa-whatsapp"></i> المساعد</button>`;
-
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
         const isAdmin = user.email === '2004oopp202326@gmail.com';
-        nav.innerHTML = `${supportBtn}
-                         <button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
+        nav.innerHTML = `<button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
                          ${isAdmin ? `<button class="nav-btn nav-btn-login" onclick="showPage('admin')"><i class="fas fa-cog"></i> الإدارة</button>` : ''}
                          <button class="nav-btn nav-btn-cart" onclick="toggleCart()"><i class="fas fa-shopping-cart"></i> <span class="cart-count" id="cartCount">0</span></button>`;
         loadWishlist(); loadAddresses();
     } else {
         userWishlistIds = []; userAddresses = [];
-        nav.innerHTML = `${supportBtn}
-                         <button class="nav-btn nav-btn-login" onclick="showPage('auth')">دخول</button>
+        nav.innerHTML = `<button class="nav-btn nav-btn-login" onclick="showPage('auth')">دخول</button>
                          <button class="nav-btn nav-btn-cart" onclick="toggleCart()"><i class="fas fa-shopping-cart"></i> <span class="cart-count" id="cartCount">0</span></button>`;
     }
     updateCartUI();
@@ -321,7 +315,6 @@ async function submitOrder(e) {
     const subtotal = cart.reduce((s, i) => s + (i.price * i.qty), 0);
     let dv = 0; if(appliedDiscountAmount < 1 && appliedDiscountAmount > 0) dv = subtotal * appliedDiscountAmount; else dv = appliedDiscountAmount;
     let ft = subtotal - dv; if(ft < 0) ft = 0;
-    
     const { data, error } = await db.from('orders').insert([{ 
         user_id: currentUser.id, 
         total: ft, 
@@ -329,12 +322,10 @@ async function submitOrder(e) {
         customer_name: document.getElementById('orderName').value, 
         customer_phone: document.getElementById('orderPhone').value, 
         customer_address: document.getElementById('orderAddress').value, 
-        customer_city: 'نينوى',
         coupon_used: appliedCouponCode,
         delivery_cost: 0,
         delivery_time: 'قيد التحديد'
     }]).select();
-    
     if (error) { showToast(error.message, 'error'); btn.disabled = false; } 
     else { document.getElementById('invoiceId').textContent = '#' + data[0].id; document.getElementById('checkoutModal').classList.remove('active'); document.getElementById('invoiceModal').classList.add('active'); cart = []; saveCart(); updateCartUI(); btn.disabled = false; }
 }
@@ -363,7 +354,7 @@ async function loadProfileData() {
             : `<div class="status-track"><div class="status-step ${s1}"><div class="status-dot"></div>انتظار</div><div class="status-step ${s2}"><div class="status-dot"></div>توصيل (${o.delivery_time || 'قيد التحديد'})</div><div class="status-step ${s3}"><div class="status-dot"></div>تم</div></div>`;
 
         let cancelBtnHtml = (o.status === 'pending') ? `<button onclick="userCancelOrder(${o.id})" class="btn-delete" style="margin-top:10px; width:100%;"><i class="fas fa-times-circle"></i> إلغاء الطلب الآن</button>` : '';
-        let deliveryInfo = (o.delivery_cost && o.delivery_cost > 0) ? `<div style="margin-top:5px; color:var(--blue);">تكلفة التوصيل: ${Number(o.delivery_cost).toLocaleString()} د.ع (${o.delivery_time})</div>` : '';
+        let deliveryInfo = o.delivery_cost > 0 ? `<div style="margin-top:5px; color:var(--blue);">تكلفة التوصيل: ${Number(o.delivery_cost).toLocaleString()} د.ع (${o.delivery_time})</div>` : '';
         
         return `<div style="background:white; padding:15px; border-radius:10px; margin-bottom:15px;"><div style="display:flex; justify-content:space-between; border-bottom:1px solid #ddd; padding-bottom:10px;"><b>طلب #${o.id}</b><b style="color:var(--orange)">الإجمالي: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</b></div>${deliveryInfo}${trackHtml}${cancelBtnHtml}</div>`;
     }).join('') : '<p>لا توجد طلبات.</p>';
@@ -392,6 +383,7 @@ async function loadAdminData() {
     const { data: o } = await db.from('orders').select('*').order('created_at', { ascending: false });
     allProducts = p || []; allOrders = o || []; 
     
+    // التنبيه الصوتي الفوري للطلبات الجديدة
     if (previousOrderCount > 0 && allOrders.length > previousOrderCount) {
         playOrderSound();
         showToast('🔔 هناك طلب جديد ورد إلى المتجر الآن!', 'success');
@@ -663,6 +655,7 @@ function showToast(m, t = 'success') { const el = document.getElementById('toast
 document.addEventListener('DOMContentLoaded', () => { 
     initAuth(); 
     loadProducts(); 
+    // فحص دوري للطلبات الجديدة كل 30 ثانية لتشغيل التنبيه الصوتي للمدير
     setInterval(() => {
         if (currentUser && currentUser.email === '2004oopp202326@gmail.com') {
             loadAdminData();
