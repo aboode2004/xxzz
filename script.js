@@ -7,6 +7,7 @@ let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let recentViews = JSON.parse(localStorage.getItem('recentViews') || '[]');
 let activeProductId = null, modalQty = 1, appliedDiscountAmount = 0, appliedCouponCode = "";
 let previousOrderCount = 0;
+let tempEmailForOtp = "";
 
 function playOrderSound() {
     try {
@@ -51,8 +52,8 @@ function setUser(user) {
     currentUser = user;
     const nav = document.getElementById('navActions');
     
-    // زر المساعد الفني عبر الواتساب برقمك الخاص
-    const supportBtn = `<button class="nav-btn" onclick="window.open('https://wa.me/9647725372995', '_blank')" title="المساعد الفني"><i class="fab fa-whatsapp"></i> المساعد</button>`;
+    // زر تواصل مع الدعم الفني في الأعلى
+    const supportBtn = `<button class="nav-btn" onclick="window.open('https://wa.me/9647725372995', '_blank')" title="تواصل مع الدعم الفني"><i class="fab fa-whatsapp"></i> تواصل مع الدعم الفني</button>`;
 
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
@@ -78,11 +79,59 @@ function switchAuthTab(t) {
     document.getElementById('formSignup').classList.toggle('hidden', t !== 'signup');
 }
 
+async function sendEmailOTP(email) {
+    tempEmailForOtp = email;
+    const { error } = await db.auth.signInWithOtp({ email: email });
+    if (error) {
+        showToast('خطأ في إرسال الرمز: ' + error.message, 'error');
+        return false;
+    } else {
+        showToast('تم إرسال رمز التأكيد إلى بريدك الإلكتروني 📩');
+        return true;
+    }
+}
+
+async function verifyEmailOTP(tokenCode) {
+    const { data, error } = await db.auth.verifyOtp({
+        email: tempEmailForOtp,
+        token: tokenCode,
+        type: 'email'
+    });
+
+    if (error) {
+        showToast('رمز التأكيد غير صحيح أو انتهت صلاحيته', 'error');
+    } else {
+        showToast('تم تسجيل الدخول بنجاح! 🎉');
+        setUser(data.user);
+        showPage('home');
+    }
+}
+
 async function handleLogin(e) {
-    e.preventDefault(); const btn = document.getElementById('btnLogin'); btn.disabled = true; btn.textContent = 'جاري...';
-    const { error } = await db.auth.signInWithPassword({ email: document.getElementById('loginEmail').value, password: document.getElementById('loginPassword').value });
-    if (error) { showToast('خطأ: ' + (error.message === 'Invalid login credentials' ? 'البريد أو كلمة المرور غير صحيحة' : error.message), 'error'); btn.disabled = false; btn.textContent = 'دخول'; } 
-    else { showToast('مرحباً!'); showPage('home'); }
+    e.preventDefault(); 
+    const btn = document.getElementById('btnLogin'); 
+    btn.disabled = true; 
+    btn.textContent = 'جاري...';
+    
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    if (!password) {
+        await sendEmailOTP(email);
+        btn.disabled = false; 
+        btn.textContent = 'دخول';
+        return;
+    }
+
+    const { error } = await db.auth.signInWithPassword({ email: email, password: password });
+    if (error) { 
+        showToast('خطأ: ' + (error.message === 'Invalid login credentials' ? 'البريد أو كلمة المرور غير صحيحة' : error.message), 'error'); 
+        btn.disabled = false; 
+        btn.textContent = 'دخول'; 
+    } else { 
+        showToast('مرحباً!'); 
+        showPage('home'); 
+    }
 }
 
 function generateUsername(name) {
@@ -410,6 +459,19 @@ async function loadAdminData() {
     renderAdminProducts(); 
     renderAdminOrders();
     renderLowStock();
+}
+
+// ------------------- ميزة تصفير الإحصائيات للمدير -------------------
+async function resetAdminStats() {
+    if (!confirm('⚠️ هل أنت متأكد من تصفير جميع الإحصائيات وحذف جميع الطلبات السجّلة نهائياً؟')) return;
+    
+    const { error } = await db.from('orders').delete().neq('id', 0); // حذف كافة الطلبات لتصفير المبيعات والطلبات
+    if (error) {
+        showToast('تعذر تصفير الإحصائيات: ' + error.message, 'error');
+    } else {
+        showToast('🔄 تم تصفير جميع إحصائيات المبيعات والطلبات بنجاح!');
+        loadAdminData();
+    }
 }
 
 function renderAdminProducts() {
