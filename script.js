@@ -28,9 +28,23 @@ function playOrderSound() {
 function showPage(pageName) {
     ['home', 'auth', 'profile', 'admin'].forEach(p => document.getElementById('page-' + p).classList.add('hidden'));
     document.getElementById('page-' + pageName).classList.remove('hidden');
+    
+    const backBtn = document.getElementById('backButtonContainer');
+    if (backBtn) {
+        backBtn.style.display = (pageName === 'home') ? 'none' : 'block';
+    }
+    
     if(pageName === 'profile') { switchUserTab('orders'); loadProfileData(); }
     if(pageName === 'admin') { switchAdminTab('products'); loadAdminData(); loadCategories(); }
     if(pageName === 'home') { window.scrollTo(0,0); renderRecentlyViewed(); }
+}
+
+function goBack() {
+    if (document.referrer && document.referrer.includes(window.location.hostname)) {
+        window.history.back();
+    } else {
+        showPage('home');
+    }
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -490,33 +504,25 @@ async function updateOrderStatus(id, s) {
     loadAdminData(); 
 }
 
-function runLotteryDraw() {
-    const startTimeStr = document.getElementById('lotteryStartTime').value;
-    const endTimeStr = document.getElementById('lotteryEndTime').value;
-    
-    if(!startTimeStr || !endTimeStr) { showToast('يرجى تحديد وقت البداية والنهاية للقرعة', 'error'); return; }
-
-    const validOrders = allOrders.filter(o => {
-        if(!o.created_at) return false;
-        const orderTime = new Date(o.created_at).toTimeString().slice(0,5);
-        return orderTime >= startTimeStr && orderTime <= endTimeStr && o.status !== 'rejected';
-    });
-
+async function runLotteryDraw() {
     const resultContainer = document.getElementById('lotteryResultContainer');
     const winnerDetails = document.getElementById('lotteryWinnerDetails');
-
-    if(validOrders.length === 0) {
-        resultContainer.style.display = 'block';
-        winnerDetails.innerHTML = '<span style="color:var(--red);">لا توجد طلبات مسجلة ضمن هذا الوقت المحدد للقرعة!</span>';
+    resultContainer.style.display = 'block';
+    winnerDetails.innerHTML = 'جاري سحب القرعة...';
+    
+    const { data: orders } = await db.from('orders').select('user_id, customer_name, customer_phone');
+    if(!orders || orders.length === 0) {
+        winnerDetails.innerHTML = '<span style="color:var(--red);">لا يوجد عملاء لديهم طلبات بعد.</span>';
         return;
     }
-
-    const randomIndex = Math.floor(Math.random() * validOrders.length);
-    const winner = validOrders[randomIndex];
-
-    resultContainer.style.display = 'block';
-    winnerDetails.innerHTML = `رقم الطلب: #${winner.id} <br>اسم الزبون: ${winner.customer_name} <br>هاتف الزبون: ${winner.customer_phone} <br>العنوان: ${winner.customer_address}`;
-    showToast('تم إجراء القرعة بنجاح وإعلان الفائز! 🎁');
+    
+    const randomIndex = Math.floor(Math.random() * orders.length);
+    const winner = orders[randomIndex];
+    
+    winnerDetails.innerHTML = `🎉 الاسم: ${winner.customer_name} <br>📞 الهاتف: ${winner.customer_phone}`;
+    showToast('تم إجراء القرعة بنجاح!');
+    
+    await db.from('lottery_winners').insert([{ customer_name: winner.customer_name, customer_phone: winner.customer_phone }]);
 }
 
 function renderLowStock() {
@@ -654,26 +660,44 @@ async function submitNewProduct(e) {
 function showToast(m, t = 'success') { const el = document.getElementById('toast'); el.textContent = m; el.style.background = t === 'error' ? '#dc3545' : '#28a745'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
 
 // ==========================================
-// إدارة الشريط المتحرك والأقسام
+// إدارة الشريط المتحرك (مع وقت التشغيل) والأقسام
 // ==========================================
 async function loadMarquee() {
-    const { data } = await db.from('site_settings').select('marquee_text').eq('id', 1).single();
-    if(data && data.marquee_text) {
-        const el = document.getElementById('marqueeText');
-        if(el) el.textContent = data.marquee_text;
-        const input = document.getElementById('marqueeTextInput');
-        if(input) input.value = data.marquee_text;
+    const { data } = await db.from('site_settings').select('marquee_text, marquee_start_time, marquee_end_time').eq('id', 1).single();
+    if(data) {
+        const now = new Date();
+        const currentTime = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+        const start = data.marquee_start_time || '00:00';
+        const end = data.marquee_end_time || '23:59';
+        
+        const marqueeBar = document.getElementById('marqueeBar');
+        if (marqueeBar) {
+            if (currentTime >= start && currentTime <= end) {
+                marqueeBar.style.display = 'block';
+                document.getElementById('marqueeText').textContent = data.marquee_text || '';
+            } else {
+                marqueeBar.style.display = 'none';
+            }
+        }
+        const textInput = document.getElementById('marqueeTextInput');
+        if(textInput) textInput.value = data.marquee_text || '';
+        const startInput = document.getElementById('marqueeStart');
+        if(startInput) startInput.value = start;
+        const endInput = document.getElementById('marqueeEnd');
+        if(endInput) endInput.value = end;
     }
 }
 
 async function handleUpdateMarquee(e) {
     e.preventDefault();
     const text = document.getElementById('marqueeTextInput').value.trim();
+    const start = document.getElementById('marqueeStart').value;
+    const end = document.getElementById('marqueeEnd').value;
     const btn = document.getElementById('btnMarquee');
     btn.disabled = true; btn.textContent = 'جاري الحفظ...';
-    const { error } = await db.from('site_settings').update({ marquee_text: text }).eq('id', 1);
+    const { error } = await db.from('site_settings').update({ marquee_text: text, marquee_start_time: start, marquee_end_time: end }).eq('id', 1);
     if(error) showToast('خطأ: ' + error.message, 'error');
-    else { showToast('تم تحديث الشريط المتحرك!'); loadMarquee(); }
+    else { showToast('تم تحديث الشريط!'); loadMarquee(); }
     btn.disabled = false; btn.textContent = 'حفظ النص';
 }
 
