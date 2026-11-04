@@ -164,6 +164,10 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             <h3 id="profileUsername" style="color:var(--orange);"></h3>
             <p id="profileName" style="font-weight:bold;"></p>
             <p id="profileEmail" style="color:var(--gray); font-size:0.9rem;"></p>
+            <div style="background:var(--orange-light,#fff8ec); padding:10px; border-radius:10px; margin-top:10px; display:flex; justify-content:center; align-items:center; gap:10px;">
+                <i class="fas fa-star" style="color:gold; font-size:1.5rem;"></i>
+                <span style="font-weight:bold; font-size:1.2rem;" id="profilePoints">0</span> نقطة
+            </div>
             <button onclick="handleLogout()" class="auth-btn" style="background:var(--red); margin-top:15px;">تسجيل الخروج</button>
         </div>
         <div class="admin-tabs" style="margin-bottom:15px;">
@@ -208,7 +212,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 <div id="page-admin" class="hidden">
     <div class="section" style="max-width:1100px;">
         <h2 class="section-title">لوحة الإدارة الشاملة</h2>
-        
         <div class="stats-grid">
             <div class="stat-card"><h3 id="statOrders">0</h3><p>الطلبات الكلية</p></div>
             <div class="stat-card"><h3 id="statSales">0</h3><p>المبيعات (د.ع)</p></div>
@@ -234,9 +237,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                     <input type="number" id="pPrice" class="form-control" placeholder="السعر" required>
                     <input type="number" id="pDiscount" class="form-control" placeholder="الخصم %">
                     <input type="number" id="pStock" class="form-control" placeholder="الكمية المتوفرة (المخزون)" value="10" required>
-                    <select id="pCategory" class="form-control" required>
-                        <option value="">-- اختر القسم --</option>
-                    </select>
+                    <select id="pCategory" class="form-control" required><option value="">-- اختر القسم --</option></select>
                     <input type="file" id="pImageFile" class="form-control" accept="image/*"><small style="display:block;color:var(--gray);margin:-8px 0 12px;">اختر صورة؛ سترفع إلى مخزن products (حد 5MB).</small>
                     <button type="submit" class="auth-btn" id="btnAddProduct">إضافة</button>
                 </form>
@@ -275,18 +276,9 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                 <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-ticket-alt"></i> إنشاء كود خصم جديد</h3>
                 <form onsubmit="submitNewCoupon(event)" style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:10px; margin-bottom:20px; align-items:end;">
-                    <div>
-                        <label style="font-weight:bold; font-size:0.8rem;">الكود:</label>
-                        <input type="text" id="couponCodeInput" class="form-control" placeholder="SALE20" required style="text-transform:uppercase;">
-                    </div>
-                    <div>
-                        <label style="font-weight:bold; font-size:0.8rem;">نسبة الخصم (%):</label>
-                        <input type="number" id="couponPercent" class="form-control" placeholder="20" min="1" max="100" required>
-                    </div>
-                    <div>
-                        <label style="font-weight:bold; font-size:0.8rem;">عدد الاستخدامات:</label>
-                        <input type="number" id="couponMaxUses" class="form-control" placeholder="100" min="1" required>
-                    </div>
+                    <div><label style="font-weight:bold; font-size:0.8rem;">الكود:</label><input type="text" id="couponCodeInput" class="form-control" placeholder="SALE20" required style="text-transform:uppercase;"></div>
+                    <div><label style="font-weight:bold; font-size:0.8rem;">نسبة الخصم (%):</label><input type="number" id="couponPercent" class="form-control" placeholder="20" min="1" max="100" required></div>
+                    <div><label style="font-weight:bold; font-size:0.8rem;">عدد الاستخدامات:</label><input type="number" id="couponMaxUses" class="form-control" placeholder="100" min="1" required></div>
                     <button type="submit" class="auth-btn" style="width:100px; height:45px;">إنشاء</button>
                 </form>
                 <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-list"></i> الأكواد الحالية</h3>
@@ -311,16 +303,10 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                 <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                     <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-scroll"></i> نص الشريط المتحرك</h3>
                     <form onsubmit="handleUpdateMarquee(event)">
-                        <textarea id="marqueeTextInput" class="form-control" placeholder="اكتب هنا النص الذي سيظهر متحركاً في أعلى الموقع" rows="3" required></textarea>
+                        <textarea id="marqueeTextInput" class="form-control" placeholder="اكتب هنا النص الذي سيظهر متحركاً" rows="3" required></textarea>
                         <div style="display:flex; gap:10px; margin-bottom:15px;">
-                            <div style="flex:1;">
-                                <label style="font-weight:bold; font-size:0.85rem;">وقت التشغيل:</label>
-                                <input type="time" id="marqueeStart" class="form-control" required>
-                            </div>
-                            <div style="flex:1;">
-                                <label style="font-weight:bold; font-size:0.85rem;">وقت الإيقاف:</label>
-                                <input type="time" id="marqueeEnd" class="form-control" required>
-                            </div>
+                            <div style="flex:1;"><label style="font-weight:bold; font-size:0.85rem;">وقت التشغيل:</label><input type="time" id="marqueeStart" class="form-control" required></div>
+                            <div style="flex:1;"><label style="font-weight:bold; font-size:0.85rem;">وقت الإيقاف:</label><input type="time" id="marqueeEnd" class="form-control" required></div>
                         </div>
                         <button type="submit" class="auth-btn" id="btnMarquee" style="background:var(--orange);">حفظ النص</button>
                     </form>
@@ -335,14 +321,8 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                 <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                     <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-key"></i> تغيير كلمة مرور المدير</h3>
                     <form onsubmit="handleAdminUpdatePassword(event)">
-                        <div class="input-group">
-                            <input type="password" id="adminNewPass" class="form-control" placeholder="كلمة المرور الجديدة (6 أحرف فأكثر)" required minlength="6">
-                            <i class="fas fa-eye eye-icon" onclick="togglePassword('adminNewPass', this)"></i>
-                        </div>
-                        <div class="input-group">
-                            <input type="password" id="adminConfirmPass" class="form-control" placeholder="تأكيد كلمة المرور الجديدة" required minlength="6">
-                            <i class="fas fa-eye eye-icon" onclick="togglePassword('adminConfirmPass', this)"></i>
-                        </div>
+                        <div class="input-group"><input type="password" id="adminNewPass" class="form-control" placeholder="كلمة المرور الجديدة (6 أحرف فأكثر)" required minlength="6"><i class="fas fa-eye eye-icon" onclick="togglePassword('adminNewPass', this)"></i></div>
+                        <div class="input-group"><input type="password" id="adminConfirmPass" class="form-control" placeholder="تأكيد كلمة المرور الجديدة" required minlength="6"><i class="fas fa-eye eye-icon" onclick="togglePassword('adminConfirmPass', this)"></i></div>
                         <button type="submit" class="auth-btn" id="btnAdminPass" style="background:var(--purple-dark);">تحديث كلمة المرور</button>
                     </form>
                 </div>
@@ -357,8 +337,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         </div>
     </div>
 </div>
-
-<!-- نافذة تحديد تفاصيل التوصيل -->
+    <!-- نافذة تحديد تفاصيل التوصيل -->
 <div class="modal-overlay" id="deliveryDetailsModal">
     <div class="modal">
         <button class="modal-close" onclick="closeModal('deliveryDetailsModal')"><i class="fas fa-times"></i></button>
@@ -409,6 +388,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         </div>
         <button class="buy-now-btn" onclick="buyNowFromModal()"><i class="fas fa-bolt"></i> اشترِ الآن</button>
         <button class="add-to-cart" style="width:100%; margin-bottom:20px;" onclick="addToCartFromModal()">أضف للسلة</button>
+        <button onclick="shareProduct()" style="width:100%; background:#007bff; color:white; border:none; padding:10px; border-radius:10px; cursor:pointer; font-weight:bold; margin-bottom:20px;"><i class="fas fa-share-alt"></i> مشاركة المنتج</button>
         <h4>التقييمات:</h4>
         <div id="reviewsList" style="margin-top:10px; margin-bottom:15px;"></div>
         <form id="reviewForm" class="hidden" onsubmit="submitReview(event)">
@@ -471,6 +451,25 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         <p style="color:var(--gray);margin-bottom:15px;">رقم الطلب: <strong id="invoiceId"></strong></p>
         <button onclick="window.print()" class="auth-btn" style="background:var(--purple-dark);margin-bottom:10px;"><i class="fas fa-print"></i> طباعة</button>
         <button onclick="closeModal('invoiceModal')" class="auth-btn">إغلاق</button>
+    </div>
+</div>
+
+<!-- نافذة الطلب السريع -->
+<div class="modal-overlay" id="quickOrderModal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeModal('quickOrderModal')"><i class="fas fa-times"></i></button>
+        <h2 style="text-align:center; margin-bottom:15px;">⚡ طلب سريع</h2>
+        <p style="text-align:center; color:var(--gray); margin-bottom:15px;" id="quickOrderProductName"></p>
+        <form onsubmit="submitQuickOrder(event)">
+            <input type="hidden" id="quickOrderProductId">
+            <input type="text" id="quickName" class="form-control" placeholder="الاسم الكامل" required>
+            <input type="tel" id="quickPhone" class="form-control" placeholder="رقم الهاتف" required>
+            <input type="text" id="quickAddress" class="form-control" placeholder="العنوان بالتفصيل" required>
+            <div style="background:var(--gray-light); padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;">
+                <strong>السعر: <span id="quickPrice" style="color:var(--orange);"></span></strong>
+            </div>
+            <button type="submit" class="auth-btn" id="btnQuickOrder" style="background:var(--green);"><i class="fas fa-bolt"></i> تأكيد الطلب السريع</button>
+        </form>
     </div>
 </div>
 
