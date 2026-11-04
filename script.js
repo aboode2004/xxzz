@@ -60,7 +60,7 @@ function setUser(user) {
     const nav = document.getElementById('navActions');
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
-        const isAdmin = user.email === '2004oopp202326@gmail.com';
+        const isAdmin = user.user_metadata?.role === 'admin';
         nav.innerHTML = `<button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
                          ${isAdmin ? `<button class="nav-btn nav-btn-login" onclick="showPage('admin')"><i class="fas fa-cog"></i> الإدارة</button>` : ''}
                          <button class="nav-btn nav-btn-cart" onclick="toggleCart()"><i class="fas fa-shopping-cart"></i> <span class="cart-count" id="cartCount">0</span></button>`;
