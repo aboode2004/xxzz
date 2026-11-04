@@ -71,7 +71,7 @@ function setUser(user) {
     const nav = document.getElementById('navActions');
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
-        const isAdmin = user.user_metadata?.role === 'admin';
+        const isAdmin = user.id === '04a16772-0bf9-4acd-8007-ab7f1e085751';
         nav.innerHTML = `<button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
                          ${isAdmin ? `<button class="nav-btn nav-btn-login" onclick="showPage('admin')"><i class="fas fa-cog"></i> الإدارة</button>` : ''}
                          <button class="nav-btn nav-btn-cart" onclick="toggleCart()"><i class="fas fa-shopping-cart"></i> <span class="cart-count" id="cartCount">0</span></button>`;
