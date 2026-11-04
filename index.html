@@ -107,7 +107,14 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
     </div>
 </nav>
 
-<!-- الشريط المتحرك الجديد -->
+<!-- زر الرجوع (الجديد) -->
+<div id="backButtonContainer" style="display:none; max-width:1400px; margin:10px auto; padding:0 20px;">
+    <button onclick="goBack()" style="background:var(--purple-dark); color:white; border:none; padding:8px 15px; border-radius:10px; font-family:inherit; font-weight:bold; cursor:pointer;">
+        <i class="fas fa-arrow-right"></i> رجوع
+    </button>
+</div>
+
+<!-- الشريط المتحرك -->
 <div id="marqueeBar" style="background:var(--purple-dark); color:var(--white); padding:8px 0; overflow:hidden; font-weight:bold;">
     <marquee id="marqueeText" direction="right" scrollamount="6" style="font-size:1rem;"></marquee>
 </div>
@@ -261,7 +268,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             </div>
         </div>
 
-        <!-- قسم الأقسام الجديد -->
         <div id="adminCategoriesSection" class="hidden">
             <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                 <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-folder-plus"></i> إضافة قسم جديد</h3>
@@ -276,18 +282,8 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 
         <div id="adminLotterySection" class="hidden">
             <div style="background:var(--white); padding:25px; border-radius:15px; box-shadow:var(--shadow); text-align:center;">
-                <h3 style="color:var(--purple-dark); margin-bottom:15px;"><i class="fas fa-gift"></i> نظام القرعة التلقائية للهدايا</h3>
-                <p style="color:var(--gray); margin-bottom:20px;">حدد الفترة الزمنية لسحب فائز عشوائي من الطلبات المسجلة في تلك الفترة تلقائياً.</p>
-                <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin-bottom:20px;">
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">من الساعة:</label>
-                        <input type="time" id="lotteryStartTime" class="form-control" value="20:00" style="width:160px;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">إلى الساعة:</label>
-                        <input type="time" id="lotteryEndTime" class="form-control" value="21:00" style="width:160px;">
-                    </div>
-                </div>
+                <h3 style="color:var(--purple-dark); margin-bottom:15px;"><i class="fas fa-gift"></i> القرعة بين المستخدمين المسجلين</h3>
+                <p style="color:var(--gray); margin-bottom:20px;">سيتم اختيار فائز عشوائي من بين جميع المستخدمين الذين سجلوا في المتجر.</p>
                 <button onclick="runLotteryDraw()" class="auth-btn" style="background:var(--orange); max-width:250px; margin:0 auto; font-size:1.1rem;"><i class="fas fa-dice"></i> سحب القرعة الآن</button>
                 <div id="lotteryResultContainer" style="margin-top:25px; padding:15px; border-radius:10px; background:var(--gray-light); display:none;">
                     <h4 style="color:var(--green); margin-bottom:10px;">🎉 الفائز بالقرعة هو:</h4>
@@ -298,15 +294,23 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 
         <div id="adminSettingsSection" class="hidden">
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
-                <!-- إعداد الشريط المتحرك -->
                 <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                     <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-scroll"></i> نص الشريط المتحرك</h3>
                     <form onsubmit="handleUpdateMarquee(event)">
                         <textarea id="marqueeTextInput" class="form-control" placeholder="اكتب هنا النص الذي سيظهر متحركاً في أعلى الموقع" rows="3" required></textarea>
+                        <div style="display:flex; gap:10px; margin-bottom:15px;">
+                            <div style="flex:1;">
+                                <label style="font-weight:bold; font-size:0.85rem;">وقت التشغيل:</label>
+                                <input type="time" id="marqueeStart" class="form-control" required>
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-weight:bold; font-size:0.85rem;">وقت الإيقاف:</label>
+                                <input type="time" id="marqueeEnd" class="form-control" required>
+                            </div>
+                        </div>
                         <button type="submit" class="auth-btn" id="btnMarquee" style="background:var(--orange);">حفظ النص</button>
                     </form>
                 </div>
-                <!-- تغيير بريد المدير -->
                 <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                     <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-envelope"></i> تغيير بريد المدير</h3>
                     <form onsubmit="handleAdminUpdateEmail(event)">
@@ -314,7 +318,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                         <button type="submit" class="auth-btn" id="btnAdminEmail" style="background:var(--orange);">حفظ البريد الجديد</button>
                     </form>
                 </div>
-                <!-- تغيير كلمة مرور المدير -->
                 <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                     <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-key"></i> تغيير كلمة مرور المدير</h3>
                     <form onsubmit="handleAdminUpdatePassword(event)">
@@ -338,10 +341,9 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                 <div id="lowStockList"></div>
             </div>
         </div>
-
     </div>
-</div>
-<!-- نافذة تحديد تفاصيل التوصيل -->
+    </div>
+    <!-- نافذة تحديد تفاصيل التوصيل -->
 <div class="modal-overlay" id="deliveryDetailsModal">
     <div class="modal">
         <button class="modal-close" onclick="closeModal('deliveryDetailsModal')"><i class="fas fa-times"></i></button>
@@ -461,10 +463,10 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 <div id="printSection" style="display:none; padding:20px; font-family:'Cairo', sans-serif;"></div>
 
 <div class="toast" id="toast"></div>
-<a href="https://wa.me/9647700000000" target="_blank" class="whatsapp-float"><i class="fab fa-whatsapp"></i></a>
+<a href="https://wa.me/9647725372995" target="_blank" class="whatsapp-float"><i class="fab fa-whatsapp"></i></a>
 <footer style="text-align:center; padding:30px; background:var(--purple-dark); color:white;"><strong>يساعدكم</strong> © 2026</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
 </body>
-    </html>
+</html>
