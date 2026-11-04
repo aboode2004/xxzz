@@ -344,7 +344,15 @@ async function submitOrder(e) {
         const earned = Math.floor(ft / 1000);
         const { data: profile } = await db.from('profiles').select('loyalty_points').eq('id', currentUser.id).single();
         if (profile) await db.from('profiles').update({ loyalty_points: (profile.loyalty_points || 0) + earned }).eq('id', currentUser.id);
-        
+        // --- بداية كود خصم المخزون ---
+for (const item of cart) {
+    const { data: prod } = await db.from('products').select('stock').eq('id', item.id).single();
+    if (prod) {
+        const newStock = Math.max(0, prod.stock - item.qty);
+        await db.from('products').update({ stock: newStock }).eq('id', item.id);
+    }
+}
+// --- نهاية كود خصم المخزون ---
         document.getElementById('invoiceId').textContent = '#' + data[0].id; 
         document.getElementById('checkoutModal').classList.remove('active'); 
         document.getElementById('invoiceModal').classList.add('active'); 
