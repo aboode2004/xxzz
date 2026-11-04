@@ -107,6 +107,11 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
     </div>
 </nav>
 
+<!-- الشريط المتحرك الجديد -->
+<div id="marqueeBar" style="background:var(--purple-dark); color:var(--white); padding:8px 0; overflow:hidden; font-weight:bold;">
+    <marquee id="marqueeText" direction="right" scrollamount="6" style="font-size:1rem;"></marquee>
+</div>
+
 <!-- Home Page -->
 <div id="page-home">
     <div class="hero"><h1>أفضل المنتجات في <span>نينوى</span> 🛍️</h1></div>
@@ -125,7 +130,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         <div class="products-grid" id="productsGrid">جاري التحميل...</div>
     </div>
 </div>
-
 <!-- Auth Page -->
 <div id="page-auth" class="hidden">
     <div class="auth-wrapper">
@@ -208,7 +212,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
     <div class="section" style="max-width:1100px;">
         <h2 class="section-title">لوحة الإدارة الشاملة</h2>
         
-        <!-- الإحصائيات -->
         <div class="stats-grid">
             <div class="stat-card"><h3 id="statOrders">0</h3><p>الطلبات الكلية</p></div>
             <div class="stat-card"><h3 id="statSales">0</h3><p>المبيعات (د.ع)</p></div>
@@ -216,16 +219,15 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             <div class="stat-card"><h3 id="statTotalStock">0</h3><p>قطع المخزون</p></div>
         </div>
 
-        <!-- تبويبات الإدارة -->
         <div class="admin-tabs">
             <button class="admin-tab active" id="tabAdminProducts" onclick="switchAdminTab('products')">المنتجات</button>
             <button class="admin-tab" id="tabAdminOrders" onclick="switchAdminTab('orders')">الطلبات</button>
+            <button class="admin-tab" id="tabAdminCategories" onclick="switchAdminTab('categories')">الأقسام 📂</button>
             <button class="admin-tab" id="tabAdminLottery" onclick="switchAdminTab('lottery')">سحب القرعة 🎁</button>
             <button class="admin-tab" id="tabAdminSettings" onclick="switchAdminTab('settings')">إعدادات المدير ⚙️</button>
             <button class="admin-tab" id="tabAdminReports" onclick="switchAdminTab('reports')">التقارير والمخزون 📊</button>
         </div>
 
-        <!-- قسم المنتجات -->
         <div id="adminProductsSection">
             <div style="background:var(--white); padding:20px; border-radius:15px; margin-bottom:20px;">
                 <h3>إضافة منتج جديد</h3>
@@ -234,6 +236,9 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                     <input type="number" id="pPrice" class="form-control" placeholder="السعر" required>
                     <input type="number" id="pDiscount" class="form-control" placeholder="الخصم %">
                     <input type="number" id="pStock" class="form-control" placeholder="الكمية المتوفرة (المخزون)" value="10" required>
+                    <select id="pCategory" class="form-control" required>
+                        <option value="">-- اختر القسم --</option>
+                    </select>
                     <input type="file" id="pImageFile" class="form-control" accept="image/*"><small style="display:block;color:var(--gray);margin:-8px 0 12px;">اختر صورة؛ سترفع إلى مخزن products (حد 5MB).</small>
                     <button type="submit" class="auth-btn" id="btnAddProduct">إضافة</button>
                 </form>
@@ -245,7 +250,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             </div>
         </div>
 
-        <!-- قسم الطلبات -->
         <div id="adminOrdersSection" class="hidden">
             <div style="background:var(--white); padding:20px; border-radius:15px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
@@ -257,7 +261,19 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             </div>
         </div>
 
-        <!-- قسم سحب القرعة -->
+        <!-- قسم الأقسام الجديد -->
+        <div id="adminCategoriesSection" class="hidden">
+            <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
+                <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-folder-plus"></i> إضافة قسم جديد</h3>
+                <form onsubmit="submitNewCategory(event)" style="display:flex; gap:10px; margin-bottom:20px;">
+                    <input type="text" id="newCategoryName" class="form-control" placeholder="اسم القسم الجديد (مثال: إلكترونيات)" required>
+                    <button type="submit" class="auth-btn" style="width:120px;">إضافة</button>
+                </form>
+                <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-list"></i> الأقسام الحالية</h3>
+                <div id="categoriesList"></div>
+            </div>
+        </div>
+
         <div id="adminLotterySection" class="hidden">
             <div style="background:var(--white); padding:25px; border-radius:15px; box-shadow:var(--shadow); text-align:center;">
                 <h3 style="color:var(--purple-dark); margin-bottom:15px;"><i class="fas fa-gift"></i> نظام القرعة التلقائية للهدايا</h3>
@@ -280,9 +296,17 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             </div>
         </div>
 
-        <!-- قسم إعدادات المدير -->
         <div id="adminSettingsSection" class="hidden">
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
+                <!-- إعداد الشريط المتحرك -->
+                <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
+                    <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-scroll"></i> نص الشريط المتحرك</h3>
+                    <form onsubmit="handleUpdateMarquee(event)">
+                        <textarea id="marqueeTextInput" class="form-control" placeholder="اكتب هنا النص الذي سيظهر متحركاً في أعلى الموقع" rows="3" required></textarea>
+                        <button type="submit" class="auth-btn" id="btnMarquee" style="background:var(--orange);">حفظ النص</button>
+                    </form>
+                </div>
+                <!-- تغيير بريد المدير -->
                 <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                     <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-envelope"></i> تغيير بريد المدير</h3>
                     <form onsubmit="handleAdminUpdateEmail(event)">
@@ -290,6 +314,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                         <button type="submit" class="auth-btn" id="btnAdminEmail" style="background:var(--orange);">حفظ البريد الجديد</button>
                     </form>
                 </div>
+                <!-- تغيير كلمة مرور المدير -->
                 <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                     <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-key"></i> تغيير كلمة مرور المدير</h3>
                     <form onsubmit="handleAdminUpdatePassword(event)">
@@ -307,7 +332,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             </div>
         </div>
 
-        <!-- قسم التقارير والمخزون المنخفض -->
         <div id="adminReportsSection" class="hidden">
             <div style="background:var(--white); padding:20px; border-radius:15px; margin-bottom:20px;">
                 <h3 style="color:var(--red); margin-bottom:15px;"><i class="fas fa-exclamation-triangle"></i> تنبيهات المخزون المنخفض (أقل من 5 قطع)</h3>
@@ -317,7 +341,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 
     </div>
 </div>
-
 <!-- نافذة تحديد تفاصيل التوصيل -->
 <div class="modal-overlay" id="deliveryDetailsModal">
     <div class="modal">
@@ -444,4 +467,4 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
 </body>
-</html>
+    </html>
