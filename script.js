@@ -14,8 +14,8 @@ function playOrderSound() {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 note
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5 note
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15);
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
         osc.connect(gain);
@@ -29,7 +29,7 @@ function showPage(pageName) {
     ['home', 'auth', 'profile', 'admin'].forEach(p => document.getElementById('page-' + p).classList.add('hidden'));
     document.getElementById('page-' + pageName).classList.remove('hidden');
     if(pageName === 'profile') { switchUserTab('orders'); loadProfileData(); }
-    if(pageName === 'admin') { switchAdminTab('products'); loadAdminData(); }
+    if(pageName === 'admin') { switchAdminTab('products'); loadAdminData(); loadCategories(); }
     if(pageName === 'home') { window.scrollTo(0,0); renderRecentlyViewed(); }
 }
 
@@ -361,12 +361,13 @@ async function loadProfileData() {
 }
 
 function switchAdminTab(tab) {
-    ['products', 'orders', 'lottery', 'settings', 'reports'].forEach(t => {
+    ['products', 'orders', 'lottery', 'settings', 'reports', 'categories'].forEach(t => {
         const btn = document.getElementById('tabAdmin' + t.charAt(0).toUpperCase() + t.slice(1));
         const sec = document.getElementById('admin' + t.charAt(0).toUpperCase() + t.slice(1) + 'Section');
         if(btn) btn.classList.toggle('active', t === tab);
         if(sec) sec.classList.toggle('hidden', t !== tab);
     });
+    if(tab === 'categories') loadCategories();
 }
 
 async function quickUpdateStock(productId, delta) {
@@ -383,7 +384,6 @@ async function loadAdminData() {
     const { data: o } = await db.from('orders').select('*').order('created_at', { ascending: false });
     allProducts = p || []; allOrders = o || []; 
     
-    // التنبيه الصوتي الفوري للطلبات الجديدة
     if (previousOrderCount > 0 && allOrders.length > previousOrderCount) {
         playOrderSound();
         showToast('🔔 هناك طلب جديد ورد إلى المتجر الآن!', 'success');
@@ -637,6 +637,7 @@ async function submitNewProduct(e) {
             price: Number(document.getElementById('pPrice').value),
             discount: parseInt(document.getElementById('pDiscount').value) || 0,
             stock: parseInt(document.getElementById('pStock').value) || 0,
+            category: document.getElementById('pCategory').value || null,
             icon: '📦'
         };
         if (imageUrl) product.image_url = imageUrl;
@@ -652,10 +653,68 @@ async function submitNewProduct(e) {
 
 function showToast(m, t = 'success') { const el = document.getElementById('toast'); el.textContent = m; el.style.background = t === 'error' ? '#dc3545' : '#28a745'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
 
+// ==========================================
+// إدارة الشريط المتحرك والأقسام
+// ==========================================
+async function loadMarquee() {
+    const { data } = await db.from('site_settings').select('marquee_text').eq('id', 1).single();
+    if(data && data.marquee_text) {
+        const el = document.getElementById('marqueeText');
+        if(el) el.textContent = data.marquee_text;
+        const input = document.getElementById('marqueeTextInput');
+        if(input) input.value = data.marquee_text;
+    }
+}
+
+async function handleUpdateMarquee(e) {
+    e.preventDefault();
+    const text = document.getElementById('marqueeTextInput').value.trim();
+    const btn = document.getElementById('btnMarquee');
+    btn.disabled = true; btn.textContent = 'جاري الحفظ...';
+    const { error } = await db.from('site_settings').update({ marquee_text: text }).eq('id', 1);
+    if(error) showToast('خطأ: ' + error.message, 'error');
+    else { showToast('تم تحديث الشريط المتحرك!'); loadMarquee(); }
+    btn.disabled = false; btn.textContent = 'حفظ النص';
+}
+
+async function loadCategories() {
+    const { data } = await db.from('categories').select('*').order('id', { ascending: false });
+    const list = document.getElementById('categoriesList');
+    if(!list) return;
+    list.innerHTML = data && data.length ? data.map(c => `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;">
+            <span>${c.name}</span>
+            <button onclick="deleteCategory(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button>
+        </div>
+    `).join('') : '<p>لا توجد أقسام حالياً.</p>';
+    
+    const select = document.getElementById('pCategory');
+    if(select) {
+        select.innerHTML = '<option value="">-- اختر القسم --</option>' + (data || []).map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    }
+}
+
+async function submitNewCategory(e) {
+    e.preventDefault();
+    const name = document.getElementById('newCategoryName').value.trim();
+    if(!name) return;
+    const { error } = await db.from('categories').insert([{ name: name }]);
+    if(error) showToast('خطأ: ' + error.message, 'error');
+    else { showToast('تمت إضافة القسم!'); document.getElementById('newCategoryName').value = ''; loadCategories(); }
+}
+
+async function deleteCategory(id) {
+    if(!confirm('حذف هذا القسم؟')) return;
+    const { error } = await db.from('categories').delete().eq('id', id);
+    if(error) showToast('خطأ: ' + error.message, 'error');
+    else { showToast('تم حذف القسم'); loadCategories(); }
+}
+
 document.addEventListener('DOMContentLoaded', () => { 
     initAuth(); 
     loadProducts(); 
-    // فحص دوري للطلبات الجديدة كل 30 ثانية لتشغيل التنبيه الصوتي للمدير
+    loadMarquee();
+    loadCategories();
     setInterval(() => {
         if (currentUser && currentUser.email === '2004oopp202326@gmail.com') {
             loadAdminData();
