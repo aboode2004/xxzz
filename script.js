@@ -4,7 +4,6 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentUser = null, allProducts = [], allOrders = [], userWishlistIds = [], userAddresses = [];
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
-let recentViews = JSON.parse(localStorage.getItem('recentViews') || '[]');
 let activeProductId = null, modalQty = 1, appliedDiscountAmount = 0, appliedCouponCode = "";
 let previousOrderCount = 0;
 
@@ -36,7 +35,7 @@ function showPage(pageName) {
     
     if(pageName === 'profile') { switchUserTab('orders'); loadProfileData(); }
     if(pageName === 'admin') { switchAdminTab('products'); loadAdminData(); loadCategories(); }
-    if(pageName === 'home') { window.scrollTo(0,0); renderRecentlyViewed(); }
+    if(pageName === 'home') { window.scrollTo(0,0); }
 }
 
 function goBack() {
@@ -115,7 +114,6 @@ async function handleChangePassword(e) {
     const newPass = document.getElementById('newPassword').value;
     const confirmPass = document.getElementById('confirmPassword').value;
     const btn = document.getElementById('btnChangePassword');
-
     if (newPass !== confirmPass) { showToast('كلمتا المرور غير متطابقتين', 'error'); return; }
     btn.disabled = true; btn.textContent = 'جاري التحديث...';
     const { error } = await db.auth.updateUser({ password: newPass });
@@ -177,12 +175,10 @@ function switchUserTab(tab) {
     document.getElementById('tabUserWishlist').classList.toggle('active', tab === 'wishlist');
     document.getElementById('tabUserAddresses').classList.toggle('active', tab === 'addresses');
     document.getElementById('tabUserSecurity').classList.toggle('active', tab === 'security');
-    
     document.getElementById('userOrdersSection').classList.toggle('hidden', tab !== 'orders');
     document.getElementById('userWishlistSection').classList.toggle('hidden', tab !== 'wishlist');
     document.getElementById('userAddressesSection').classList.toggle('hidden', tab !== 'addresses');
     document.getElementById('userSecuritySection').classList.toggle('hidden', tab !== 'security');
-
     if(tab === 'wishlist') loadWishlistItems();
 }
 
@@ -202,7 +198,7 @@ async function loadWishlistItems() {
 
 async function loadProducts() {
     const { data } = await db.from('products').select('*');
-    allProducts = data || []; renderProducts(allProducts); renderRecentlyViewed();
+    allProducts = data || []; renderProducts(allProducts);
 }
 
 function renderProducts(list) {
@@ -233,25 +229,9 @@ function filterProducts() { const term = document.getElementById('searchInput').
 function filterByPrice(type) { let s = [...allProducts]; if(type === 'low') s.sort((a, b) => Number(a.price) - Number(b.price)); if(type === 'high') s.sort((a, b) => Number(b.price) - Number(a.price)); renderProducts(s); }
 function filterByRating() { let s = [...allProducts]; s.sort((a, b) => (b.rating || 0) - (a.rating || 0)); renderProducts(s); }
 
-function addToRecentViews(id) {
-    recentViews = recentViews.filter(x => x !== id); recentViews.unshift(id);
-    if(recentViews.length > 5) recentViews.pop();
-    localStorage.setItem('recentViews', JSON.stringify(recentViews));
-}
-
-function renderRecentlyViewed() {
-    const section = document.getElementById('recentlyViewedSection'), list = document.getElementById('recentlyViewedList');
-    if(recentViews.length === 0) { section.classList.add('hidden'); return; }
-    const prods = recentViews.map(id => allProducts.find(p => p.id === id)).filter(p => p);
-    if(prods.length === 0) { section.classList.add('hidden'); return; }
-    section.classList.remove('hidden');
-    list.innerHTML = prods.map(p => `<div class="product-card" onclick="openProduct(${p.id})"><div class="product-image">${p.icon || '📦'}</div><div class="product-title">${p.name}</div><div class="product-price">${Number(p.price).toLocaleString()}</div></div>`).join('');
-}
-
 async function openProduct(id) {
     const p = allProducts.find(x => x.id === id); if (!p) return;
     activeProductId = id; modalQty = 1; document.getElementById('modalQty').textContent = modalQty;
-    addToRecentViews(id);
     const iconDiv = document.getElementById('modalIcon');
     if (p.image_url) { iconDiv.style.backgroundImage = `url('${p.image_url}')`; iconDiv.textContent = ''; }
     else { iconDiv.style.backgroundImage = 'none'; iconDiv.textContent = p.icon || '📦'; }
@@ -313,7 +293,17 @@ function changeQty(id, delta) { const item = cart.find(x => x.id === id); if (!i
 
 function openCheckout() { if (!currentUser) { showToast('سجل دخول أولاً', 'error'); toggleCart(); showPage('auth'); return; } appliedDiscountAmount = 0; document.getElementById('couponCode').value = ""; updateChkTotals(); document.getElementById('checkoutModal').classList.add('active'); toggleCart(); }
 
-function applyCoupon() { const code = document.getElementById('couponCode').value.trim().toUpperCase(); appliedDiscountAmount = 0; if(code === "NINEVEH10") { appliedDiscountAmount = 0.10; appliedCouponCode = code; showToast('خصم 10%!'); } else if(code === "FREE5") { appliedDiscountAmount = 5000; appliedCouponCode = code; showToast('خصم 5000 د.ع!'); } else { showToast('كود غير صحيح', 'error'); } updateChkTotals(); }
+async function applyCoupon() {
+    const code = document.getElementById('couponCode').value.trim().toUpperCase();
+    if(!code) { showToast('أدخل كود الخصم أولاً', 'error'); return; }
+    const { data, error } = await db.from('coupons').select('*').eq('code', code).eq('is_active', true).single();
+    if(error || !data) { showToast('كود الخصم غير صحيح أو غير مفعل', 'error'); appliedDiscountAmount = 0; appliedCouponCode = ""; updateChkTotals(); return; }
+    if(data.used_count >= data.max_uses) { showToast('عذراً، تم استهلاك هذا الكود بالكامل', 'error'); appliedDiscountAmount = 0; appliedCouponCode = ""; updateChkTotals(); return; }
+    appliedDiscountAmount = data.discount_percent / 100;
+    appliedCouponCode = code;
+    showToast(`تم تطبيق خصم ${data.discount_percent}%! 🎉`);
+    updateChkTotals();
+}
 
 function updateChkTotals() {
     const subtotal = cart.reduce((s, i) => s + (i.price * i.qty), 0);
@@ -341,7 +331,16 @@ async function submitOrder(e) {
         delivery_time: 'قيد التحديد'
     }]).select();
     if (error) { showToast(error.message, 'error'); btn.disabled = false; } 
-    else { document.getElementById('invoiceId').textContent = '#' + data[0].id; document.getElementById('checkoutModal').classList.remove('active'); document.getElementById('invoiceModal').classList.add('active'); cart = []; saveCart(); updateCartUI(); btn.disabled = false; }
+    else { 
+        if(appliedCouponCode) {
+            const { data: c } = await db.from('coupons').select('used_count').eq('code', appliedCouponCode).single();
+            if(c) await db.from('coupons').update({ used_count: c.used_count + 1 }).eq('code', appliedCouponCode);
+        }
+        document.getElementById('invoiceId').textContent = '#' + data[0].id; 
+        document.getElementById('checkoutModal').classList.remove('active'); 
+        document.getElementById('invoiceModal').classList.add('active'); 
+        cart = []; saveCart(); updateCartUI(); btn.disabled = false; 
+    }
 }
 
 async function userCancelOrder(orderId) {
@@ -362,26 +361,24 @@ async function loadProfileData() {
         let s1 = 'active', s2 = '', s3 = '', isRejected = o.status === 'rejected';
         if(isRejected) { s1 = ''; s2 = ''; s3 = ''; }
         else { if(o.status === 'shipped') s2 = 'active'; if(o.status === 'delivered') { s2 = 'active'; s3 = 'active'; } }
-        
         let trackHtml = isRejected 
             ? '<div style="color:var(--red); font-weight:bold; text-align:center; margin-top:10px;">❌ تم إلغاء الطلب</div>' 
             : `<div class="status-track"><div class="status-step ${s1}"><div class="status-dot"></div>انتظار</div><div class="status-step ${s2}"><div class="status-dot"></div>توصيل (${o.delivery_time || 'قيد التحديد'})</div><div class="status-step ${s3}"><div class="status-dot"></div>تم</div></div>`;
-
         let cancelBtnHtml = (o.status === 'pending') ? `<button onclick="userCancelOrder(${o.id})" class="btn-delete" style="margin-top:10px; width:100%;"><i class="fas fa-times-circle"></i> إلغاء الطلب الآن</button>` : '';
         let deliveryInfo = o.delivery_cost > 0 ? `<div style="margin-top:5px; color:var(--blue);">تكلفة التوصيل: ${Number(o.delivery_cost).toLocaleString()} د.ع (${o.delivery_time})</div>` : '';
-        
         return `<div style="background:white; padding:15px; border-radius:10px; margin-bottom:15px;"><div style="display:flex; justify-content:space-between; border-bottom:1px solid #ddd; padding-bottom:10px;"><b>طلب #${o.id}</b><b style="color:var(--orange)">الإجمالي: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</b></div>${deliveryInfo}${trackHtml}${cancelBtnHtml}</div>`;
     }).join('') : '<p>لا توجد طلبات.</p>';
 }
 
 function switchAdminTab(tab) {
-    ['products', 'orders', 'lottery', 'settings', 'reports', 'categories'].forEach(t => {
+    ['products', 'orders', 'lottery', 'settings', 'reports', 'categories', 'coupons'].forEach(t => {
         const btn = document.getElementById('tabAdmin' + t.charAt(0).toUpperCase() + t.slice(1));
         const sec = document.getElementById('admin' + t.charAt(0).toUpperCase() + t.slice(1) + 'Section');
         if(btn) btn.classList.toggle('active', t === tab);
         if(sec) sec.classList.toggle('hidden', t !== tab);
     });
     if(tab === 'categories') loadCategories();
+    if(tab === 'coupons') loadCoupons();
 }
 
 async function quickUpdateStock(productId, delta) {
@@ -397,36 +394,23 @@ async function loadAdminData() {
     const { data: p } = await db.from('products').select('*'); 
     const { data: o } = await db.from('orders').select('*').order('created_at', { ascending: false });
     allProducts = p || []; allOrders = o || []; 
-    
-    if (previousOrderCount > 0 && allOrders.length > previousOrderCount) {
-        playOrderSound();
-        showToast('🔔 هناك طلب جديد ورد إلى المتجر الآن!', 'success');
-    }
+    if (previousOrderCount > 0 && allOrders.length > previousOrderCount) { playOrderSound(); showToast('🔔 هناك طلب جديد ورد إلى المتجر الآن!', 'success'); }
     previousOrderCount = allOrders.length;
-
     let ts = 0, totalStockCount = 0; 
     allOrders.forEach(x => { if(x.status !== 'rejected') ts += (x.total + (x.delivery_cost || 0)); });
     allProducts.forEach(prod => { totalStockCount += (prod.stock || 0); });
-
     document.getElementById('statOrders').textContent = allOrders.length; 
     document.getElementById('statSales').textContent = ts.toLocaleString();
     document.getElementById('statProductsCount').textContent = allProducts.length;
     document.getElementById('statTotalStock').textContent = totalStockCount;
-
-    renderAdminProducts(); 
-    renderAdminOrders();
-    renderLowStock();
+    renderAdminProducts(); renderAdminOrders(); renderLowStock(); loadCoupons();
 }
 
 function renderAdminProducts() {
     const t = document.getElementById('adminProductSearch').value.toLowerCase();
     document.getElementById('adminProductsList').innerHTML = allProducts.filter(p => p.name.toLowerCase().includes(t)).map(p => `
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding:10px 0;">
-            <div>
-                <b>${p.name}</b> - ${Number(p.price).toLocaleString()} د.ع 
-                <br>
-                <small>المخزون الحالي: <strong style="color:var(--orange)">${p.stock || 0}</strong> قطعة</small>
-            </div>
+            <div><b>${p.name}</b> - ${Number(p.price).toLocaleString()} د.ع <br><small>المخزون الحالي: <strong style="color:var(--orange)">${p.stock || 0}</strong> قطعة</small></div>
             <div style="display:flex; gap:5px; align-items:center;">
                 <button onclick="quickUpdateStock(${p.id}, -1)" class="btn-stock">-</button>
                 <button onclick="quickUpdateStock(${p.id}, 1)" class="btn-stock">+</button>
@@ -492,7 +476,6 @@ async function saveDeliveryDetails(e) {
     const orderId = document.getElementById('deliveryOrderId').value;
     const time = document.getElementById('deliveryTimeInput').value;
     const cost = Number(document.getElementById('deliveryCostInput').value);
-
     const { error } = await db.from('orders').update({ status: 'shipped', delivery_time: time, delivery_cost: cost }).eq('id', orderId);
     if(error) { showToast('خطأ: ' + error.message, 'error'); } 
     else { showToast('تم قبول الطلب وتحديد التوصيل بنجاح'); closeModal('deliveryDetailsModal'); loadAdminData(); }
@@ -509,29 +492,19 @@ async function runLotteryDraw() {
     const winnerDetails = document.getElementById('lotteryWinnerDetails');
     resultContainer.style.display = 'block';
     winnerDetails.innerHTML = 'جاري سحب القرعة...';
-    
     const { data: orders } = await db.from('orders').select('user_id, customer_name, customer_phone');
-    if(!orders || orders.length === 0) {
-        winnerDetails.innerHTML = '<span style="color:var(--red);">لا يوجد عملاء لديهم طلبات بعد.</span>';
-        return;
-    }
-    
+    if(!orders || orders.length === 0) { winnerDetails.innerHTML = '<span style="color:var(--red);">لا يوجد عملاء لديهم طلبات بعد.</span>'; return; }
     const randomIndex = Math.floor(Math.random() * orders.length);
     const winner = orders[randomIndex];
-    
     winnerDetails.innerHTML = `🎉 الاسم: ${winner.customer_name} <br>📞 الهاتف: ${winner.customer_phone}`;
     showToast('تم إجراء القرعة بنجاح!');
-    
     await db.from('lottery_winners').insert([{ customer_name: winner.customer_name, customer_phone: winner.customer_phone }]);
 }
 
 function renderLowStock() {
     const lowStockList = document.getElementById('lowStockList');
     const items = allProducts.filter(p => (p.stock || 0) < 5);
-    if (!items.length) {
-        lowStockList.innerHTML = '<p style="color:var(--green);">جميع المنتجات في المخزن متوفرة بجميع الكميات الكافية 👍</p>';
-        return;
-    }
+    if (!items.length) { lowStockList.innerHTML = '<p style="color:var(--green);">جميع المنتجات في المخزن متوفرة بجميع الكميات الكافية 👍</p>'; return; }
     lowStockList.innerHTML = items.map(p => `
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;">
             <div><b>${p.name}</b><br><small style="color:var(--red);">الكمية المتبقية: ${p.stock || 0} قطعة فقط</small></div>
@@ -569,16 +542,12 @@ function exportOrdersCSV() {
     if(!allOrders.length) { showToast('لا توجد طلبات لتصديرها', 'error'); return; }
     let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
     csvContent += "رقم الطلب,اسم الزبون,الهاتف,العنوان,المبلغ الإجمالي,تكلفة التوصيل,الحالة\n";
-    allOrders.forEach(o => {
-        csvContent += `"${o.id}","${o.customer_name}","${o.customer_phone}","${o.customer_address}","${o.total}","${o.delivery_cost || 0}","${o.status}"\n`;
-    });
+    allOrders.forEach(o => { csvContent += `"${o.id}","${o.customer_name}","${o.customer_phone}","${o.customer_address}","${o.total}","${o.delivery_cost || 0}","${o.status}"\n`; });
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", `orders_export_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('تم تصدير ملف الطلبات بنجاح');
 }
 
@@ -607,22 +576,12 @@ async function submitEditProduct(e) {
     try {
         const file = document.getElementById('editPImageFile').files[0];
         const imageUrl = file ? await uploadProductImage(file) : product.image_url;
-        const updates = {
-            name: document.getElementById('editPName').value.trim(),
-            price: Number(document.getElementById('editPPrice').value),
-            discount: parseInt(document.getElementById('editPDiscount').value) || 0,
-            stock: parseInt(document.getElementById('editPStock').value) || 0
-        };
+        const updates = { name: document.getElementById('editPName').value.trim(), price: Number(document.getElementById('editPPrice').value), discount: parseInt(document.getElementById('editPDiscount').value) || 0, stock: parseInt(document.getElementById('editPStock').value) || 0 };
         if (imageUrl) updates.image_url = imageUrl;
         const { error } = await db.from('products').update(updates).eq('id', id);
         if (error) throw error;
-        showToast('تم تحديث المنتج والصورة');
-        document.getElementById('editProductForm').reset();
-        closeModal('editProductModal');
-        await loadProducts(); await loadAdminData();
-    } catch (err) {
-        showToast('تعذر الحفظ: ' + (err.message || 'خطأ غير معروف'), 'error');
-    } finally { btn.disabled = false; }
+        showToast('تم تحديث المنتج والصورة'); document.getElementById('editProductForm').reset(); closeModal('editProductModal'); await loadProducts(); await loadAdminData();
+    } catch (err) { showToast('تعذر الحفظ: ' + (err.message || 'خطأ غير معروف'), 'error'); } finally { btn.disabled = false; }
 }
 
 async function deleteProduct(id) {
@@ -638,30 +597,18 @@ async function submitNewProduct(e) {
     try {
         const file = document.getElementById('pImageFile').files[0];
         const imageUrl = file ? await uploadProductImage(file) : null;
-        const product = {
-            name: document.getElementById('pName').value.trim(),
-            price: Number(document.getElementById('pPrice').value),
-            discount: parseInt(document.getElementById('pDiscount').value) || 0,
-            stock: parseInt(document.getElementById('pStock').value) || 0,
-            category: document.getElementById('pCategory').value || null,
-            icon: '📦'
-        };
+        const product = { name: document.getElementById('pName').value.trim(), price: Number(document.getElementById('pPrice').value), discount: parseInt(document.getElementById('pDiscount').value) || 0, stock: parseInt(document.getElementById('pStock').value) || 0, category: document.getElementById('pCategory').value || null, icon: '📦' };
         if (imageUrl) product.image_url = imageUrl;
         const { error } = await db.from('products').insert([product]);
         if (error) throw error;
         showToast(imageUrl ? 'تمت إضافة المنتج والصورة بنجاح' : 'تمت إضافة المنتج بدون صورة');
-        document.getElementById('addProductForm').reset();
-        await loadProducts(); await loadAdminData();
-    } catch (err) {
-        showToast('تعذرت إضافة المنتج: ' + (err.message || 'خطأ غير معروف'), 'error');
-    } finally { btn.disabled = false; }
+        document.getElementById('addProductForm').reset(); await loadProducts(); await loadAdminData();
+    } catch (err) { showToast('تعذرت إضافة المنتج: ' + (err.message || 'خطأ غير معروف'), 'error'); } finally { btn.disabled = false; }
 }
 
 function showToast(m, t = 'success') { const el = document.getElementById('toast'); el.textContent = m; el.style.background = t === 'error' ? '#dc3545' : '#28a745'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
 
-// ==========================================
-// إدارة الشريط المتحرك (مع وقت التشغيل) والأقسام
-// ==========================================
+// الشريط المتحرك والأقسام والكوبونات
 async function loadMarquee() {
     const { data } = await db.from('site_settings').select('marquee_text, marquee_start_time, marquee_end_time').eq('id', 1).single();
     if(data) {
@@ -669,22 +616,16 @@ async function loadMarquee() {
         const currentTime = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
         const start = data.marquee_start_time || '00:00';
         const end = data.marquee_end_time || '23:59';
-        
         const marqueeBar = document.getElementById('marqueeBar');
         if (marqueeBar) {
             if (currentTime >= start && currentTime <= end) {
                 marqueeBar.style.display = 'block';
                 document.getElementById('marqueeText').textContent = data.marquee_text || '';
-            } else {
-                marqueeBar.style.display = 'none';
-            }
+            } else { marqueeBar.style.display = 'none'; }
         }
-        const textInput = document.getElementById('marqueeTextInput');
-        if(textInput) textInput.value = data.marquee_text || '';
-        const startInput = document.getElementById('marqueeStart');
-        if(startInput) startInput.value = start;
-        const endInput = document.getElementById('marqueeEnd');
-        if(endInput) endInput.value = end;
+        const textInput = document.getElementById('marqueeTextInput'); if(textInput) textInput.value = data.marquee_text || '';
+        const startInput = document.getElementById('marqueeStart'); if(startInput) startInput.value = start;
+        const endInput = document.getElementById('marqueeEnd'); if(endInput) endInput.value = end;
     }
 }
 
@@ -693,8 +634,7 @@ async function handleUpdateMarquee(e) {
     const text = document.getElementById('marqueeTextInput').value.trim();
     const start = document.getElementById('marqueeStart').value;
     const end = document.getElementById('marqueeEnd').value;
-    const btn = document.getElementById('btnMarquee');
-    btn.disabled = true; btn.textContent = 'جاري الحفظ...';
+    const btn = document.getElementById('btnMarquee'); btn.disabled = true; btn.textContent = 'جاري الحفظ...';
     const { error } = await db.from('site_settings').update({ marquee_text: text, marquee_start_time: start, marquee_end_time: end }).eq('id', 1);
     if(error) showToast('خطأ: ' + error.message, 'error');
     else { showToast('تم تحديث الشريط!'); loadMarquee(); }
@@ -703,25 +643,14 @@ async function handleUpdateMarquee(e) {
 
 async function loadCategories() {
     const { data } = await db.from('categories').select('*').order('id', { ascending: false });
-    const list = document.getElementById('categoriesList');
-    if(!list) return;
-    list.innerHTML = data && data.length ? data.map(c => `
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;">
-            <span>${c.name}</span>
-            <button onclick="deleteCategory(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button>
-        </div>
-    `).join('') : '<p>لا توجد أقسام حالياً.</p>';
-    
+    const list = document.getElementById('categoriesList'); if(!list) return;
+    list.innerHTML = data && data.length ? data.map(c => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;"><span>${c.name}</span><button onclick="deleteCategory(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button></div>`).join('') : '<p>لا توجد أقسام حالياً.</p>';
     const select = document.getElementById('pCategory');
-    if(select) {
-        select.innerHTML = '<option value="">-- اختر القسم --</option>' + (data || []).map(c => `<option value="${c.name}">${c.name}</option>`).join('');
-    }
+    if(select) { select.innerHTML = '<option value="">-- اختر القسم --</option>' + (data || []).map(c => `<option value="${c.name}">${c.name}</option>`).join(''); }
 }
 
 async function submitNewCategory(e) {
-    e.preventDefault();
-    const name = document.getElementById('newCategoryName').value.trim();
-    if(!name) return;
+    e.preventDefault(); const name = document.getElementById('newCategoryName').value.trim(); if(!name) return;
     const { error } = await db.from('categories').insert([{ name: name }]);
     if(error) showToast('خطأ: ' + error.message, 'error');
     else { showToast('تمت إضافة القسم!'); document.getElementById('newCategoryName').value = ''; loadCategories(); }
@@ -730,18 +659,32 @@ async function submitNewCategory(e) {
 async function deleteCategory(id) {
     if(!confirm('حذف هذا القسم؟')) return;
     const { error } = await db.from('categories').delete().eq('id', id);
-    if(error) showToast('خطأ: ' + error.message, 'error');
-    else { showToast('تم حذف القسم'); loadCategories(); }
+    if(error) showToast('خطأ: ' + error.message, 'error'); else { showToast('تم حذف القسم'); loadCategories(); }
+}
+
+async function loadCoupons() {
+    const { data } = await db.from('coupons').select('*').order('id', { ascending: false });
+    const list = document.getElementById('couponsList'); if(!list) return;
+    list.innerHTML = data && data.length ? data.map(c => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;"><div><b style="color:var(--orange);">${c.code}</b> - خصم ${c.discount_percent}%<br><small style="color:${c.used_count >= c.max_uses ? 'var(--red)' : 'var(--gray)'};">تم استخدام: ${c.used_count} من ${c.max_uses} ${c.used_count >= c.max_uses ? '(منتهي)' : ''}</small></div><button onclick="deleteCoupon(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button></div>`).join('') : '<p>لا توجد أكواد خصم حالياً.</p>';
+}
+
+async function submitNewCoupon(e) {
+    e.preventDefault();
+    const code = document.getElementById('couponCodeInput').value.trim().toUpperCase();
+    const percent = parseInt(document.getElementById('couponPercent').value);
+    const maxUses = parseInt(document.getElementById('couponMaxUses').value);
+    const { error } = await db.from('coupons').insert([{ code: code, discount_percent: percent, max_uses: maxUses }]);
+    if(error) showToast('خطأ: ' + (error.message.includes('duplicate') ? 'هذا الكود موجود مسبقاً' : error.message), 'error');
+    else { showToast('تم إنشاء كود الخصم! 🎟️'); document.getElementById('couponCodeInput').value = ''; loadCoupons(); }
+}
+
+async function deleteCoupon(id) {
+    if(!confirm('حذف كود الخصم؟')) return;
+    const { error } = await db.from('coupons').delete().eq('id', id);
+    if(error) showToast('خطأ: ' + error.message, 'error'); else { showToast('تم الحذف'); loadCoupons(); }
 }
 
 document.addEventListener('DOMContentLoaded', () => { 
-    initAuth(); 
-    loadProducts(); 
-    loadMarquee();
-    loadCategories();
-    setInterval(() => {
-        if (currentUser && currentUser.email === '2004oopp202326@gmail.com') {
-            loadAdminData();
-        }
-    }, 30000);
+    initAuth(); loadProducts(); loadMarquee(); loadCategories();
+    setInterval(() => { if (currentUser && currentUser.email === '2004oopp202326@gmail.com') { loadAdminData(); } }, 30000);
 });
