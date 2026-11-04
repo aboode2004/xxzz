@@ -6,7 +6,18 @@ let currentUser = null, allProducts = [], allOrders = [], userWishlistIds = [], 
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let activeProductId = null, modalQty = 1, appliedDiscountAmount = 0, appliedCouponCode = "";
 let previousOrderCount = 0, userPoints = 0;
-
+function escapeHTML(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/[&<>'"]/g, 
+        tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag] || tag)
+    );
+}
 function playOrderSound() {
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
