@@ -95,7 +95,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 </head>
 <body>
 
-<!-- Navbar -->
 <nav class="navbar">
     <div class="navbar-inner">
         <a class="logo" onclick="showPage('home')"><i class="fas fa-hand-holding-heart"></i> يساعدكم</a>
@@ -107,25 +106,18 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
     </div>
 </nav>
 
-<!-- زر الرجوع (الجديد) -->
 <div id="backButtonContainer" style="display:none; max-width:1400px; margin:10px auto; padding:0 20px;">
     <button onclick="goBack()" style="background:var(--purple-dark); color:white; border:none; padding:8px 15px; border-radius:10px; font-family:inherit; font-weight:bold; cursor:pointer;">
         <i class="fas fa-arrow-right"></i> رجوع
     </button>
 </div>
 
-<!-- الشريط المتحرك -->
 <div id="marqueeBar" style="background:var(--purple-dark); color:var(--white); padding:8px 0; overflow:hidden; font-weight:bold;">
     <marquee id="marqueeText" direction="right" scrollamount="6" style="font-size:1rem;"></marquee>
 </div>
 
-<!-- Home Page -->
 <div id="page-home">
     <div class="hero"><h1>أفضل المنتجات في <span>نينوى</span> 🛍️</h1></div>
-    <div class="section hidden" id="recentlyViewedSection" style="padding-bottom:0;">
-        <h2 class="section-title" style="font-size:1.4rem;">👀 شوهد مؤخراً</h2>
-        <div class="scroll-row" id="recentlyViewedList"></div>
-    </div>
     <div class="section">
         <h2 class="section-title">منتجاتنا</h2>
         <div class="filter-bar">
@@ -137,7 +129,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         <div class="products-grid" id="productsGrid">جاري التحميل...</div>
     </div>
 </div>
-<!-- Auth Page -->
+
 <div id="page-auth" class="hidden">
     <div class="auth-wrapper">
         <div class="auth-tabs">
@@ -164,7 +156,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
     </div>
 </div>
 
-<!-- Profile Page -->
 <div id="page-profile" class="hidden">
     <div class="section">
         <h2 class="section-title">حسابي</h2>
@@ -214,7 +205,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
     </div>
 </div>
 
-<!-- Admin Page -->
 <div id="page-admin" class="hidden">
     <div class="section" style="max-width:1100px;">
         <h2 class="section-title">لوحة الإدارة الشاملة</h2>
@@ -230,6 +220,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             <button class="admin-tab active" id="tabAdminProducts" onclick="switchAdminTab('products')">المنتجات</button>
             <button class="admin-tab" id="tabAdminOrders" onclick="switchAdminTab('orders')">الطلبات</button>
             <button class="admin-tab" id="tabAdminCategories" onclick="switchAdminTab('categories')">الأقسام 📂</button>
+            <button class="admin-tab" id="tabAdminCoupons" onclick="switchAdminTab('coupons')">أكواد الخصم 🎟️</button>
             <button class="admin-tab" id="tabAdminLottery" onclick="switchAdminTab('lottery')">سحب القرعة 🎁</button>
             <button class="admin-tab" id="tabAdminSettings" onclick="switchAdminTab('settings')">إعدادات المدير ⚙️</button>
             <button class="admin-tab" id="tabAdminReports" onclick="switchAdminTab('reports')">التقارير والمخزون 📊</button>
@@ -277,6 +268,29 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                 </form>
                 <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-list"></i> الأقسام الحالية</h3>
                 <div id="categoriesList"></div>
+            </div>
+        </div>
+
+        <div id="adminCouponsSection" class="hidden">
+            <div style="background:var(--white); padding:20px; border-radius:15px; box-shadow:var(--shadow);">
+                <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-ticket-alt"></i> إنشاء كود خصم جديد</h3>
+                <form onsubmit="submitNewCoupon(event)" style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:10px; margin-bottom:20px; align-items:end;">
+                    <div>
+                        <label style="font-weight:bold; font-size:0.8rem;">الكود:</label>
+                        <input type="text" id="couponCodeInput" class="form-control" placeholder="SALE20" required style="text-transform:uppercase;">
+                    </div>
+                    <div>
+                        <label style="font-weight:bold; font-size:0.8rem;">نسبة الخصم (%):</label>
+                        <input type="number" id="couponPercent" class="form-control" placeholder="20" min="1" max="100" required>
+                    </div>
+                    <div>
+                        <label style="font-weight:bold; font-size:0.8rem;">عدد الاستخدامات:</label>
+                        <input type="number" id="couponMaxUses" class="form-control" placeholder="100" min="1" required>
+                    </div>
+                    <button type="submit" class="auth-btn" style="width:100px; height:45px;">إنشاء</button>
+                </form>
+                <h3 style="margin-bottom:15px; color:var(--purple-dark);"><i class="fas fa-list"></i> الأكواد الحالية</h3>
+                <div id="couponsList"></div>
             </div>
         </div>
 
@@ -342,8 +356,9 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             </div>
         </div>
     </div>
-    </div>
-    <!-- نافذة تحديد تفاصيل التوصيل -->
+</div>
+
+<!-- نافذة تحديد تفاصيل التوصيل -->
 <div class="modal-overlay" id="deliveryDetailsModal">
     <div class="modal">
         <button class="modal-close" onclick="closeModal('deliveryDetailsModal')"><i class="fas fa-times"></i></button>
@@ -351,12 +366,12 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         <form onsubmit="saveDeliveryDetails(event)">
             <input type="hidden" id="deliveryOrderId">
             <div style="margin-bottom:15px;">
-                <label style="display:block; font-weight:bold; margin-bottom:5px;">مدة التوصيل (مثلاً: يومين، 3 أيام):</label>
-                <input type="text" id="deliveryTimeInput" class="form-control" placeholder="أدخل المدة المتوقعة" required>
+                <label style="display:block; font-weight:bold; margin-bottom:5px;">مدة التوصيل:</label>
+                <input type="text" id="deliveryTimeInput" class="form-control" placeholder="مثلاً: يومين" required>
             </div>
             <div style="margin-bottom:15px;">
                 <label style="display:block; font-weight:bold; margin-bottom:5px;">تكلفة التوصيل (د.ع):</label>
-                <input type="number" id="deliveryCostInput" class="form-control" placeholder="مثلاً: 2000" required>
+                <input type="number" id="deliveryCostInput" class="form-control" placeholder="2000" required>
             </div>
             <button type="submit" class="auth-btn" style="background:var(--green);">حفظ وقبول الطلب</button>
         </form>
@@ -374,7 +389,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
             <input type="number" id="editPPrice" class="form-control" placeholder="السعر" required>
             <input type="number" id="editPDiscount" class="form-control" placeholder="الخصم %">
             <input type="number" id="editPStock" class="form-control" placeholder="المخزون" required>
-            <input type="file" id="editPImageFile" class="form-control" accept="image/*"><small style="display:block;color:var(--gray);margin:-8px 0 12px;">اختياري: اختر صورة جديدة لاستبدال صورة المنتج.</small>
+            <input type="file" id="editPImageFile" class="form-control" accept="image/*">
             <button type="submit" class="auth-btn" id="btnEditProduct">حفظ التغييرات</button>
         </form>
     </div>
@@ -432,7 +447,7 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         <form id="checkoutForm" onsubmit="submitOrder(event)">
             <input type="text" id="orderName" class="form-control" placeholder="الاسم الكامل" required>
             <input type="tel" id="orderPhone" class="form-control" placeholder="رقم الهاتف" required>
-            <input type="text" id="orderAddress" class="form-control" placeholder="العنوان بالتفصيل (المنطقة، الدالة)" required>
+            <input type="text" id="orderAddress" class="form-control" placeholder="العنوان بالتفصيل" required>
             <div style="display:flex; gap:10px; margin-bottom:15px;">
                 <input type="text" id="couponCode" class="form-control" placeholder="كود الخصم" style="margin-bottom:0; flex:1;">
                 <button type="button" onclick="applyCoupon()" style="background:var(--purple-dark); color:white; border:none; border-radius:10px; padding:0 15px; cursor:pointer; font-family:inherit;">تطبيق</button>
@@ -459,7 +474,6 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
     </div>
 </div>
 
-<!-- حاوية الطباعة لبوليصة الشحن -->
 <div id="printSection" style="display:none; padding:20px; font-family:'Cairo', sans-serif;"></div>
 
 <div class="toast" id="toast"></div>
