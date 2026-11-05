@@ -729,5 +729,5 @@ function showToast(m, t = 'success') { const el = document.getElementById('toast
 
 document.addEventListener('DOMContentLoaded', () => { 
     initAuth(); loadProducts(); loadMarquee(); loadCategories();
-    setInterval(() => { if (currentUser && currentUser.email === '2004oopp202326@gmail.com') { loadAdminData(); } }, 30000);
+    setInterval(() => { if (currentUser && currentUser.id === '04a16772-0bf9-4acd-8007-ab7f1e085751') { loadAdminData(); } }, 30000);
 });
