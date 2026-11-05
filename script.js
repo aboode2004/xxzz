@@ -6,6 +6,7 @@ let currentUser = null, allProducts = [], allOrders = [], userWishlistIds = [], 
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let activeProductId = null, modalQty = 1, appliedDiscountAmount = 0, appliedCouponCode = "";
 let previousOrderCount = 0, userPoints = 0;
+
 function escapeHTML(str) {
     if (typeof str !== 'string') return str;
     return str.replace(/[&<>'"]/g, 
@@ -18,6 +19,7 @@ function escapeHTML(str) {
         }[tag] || tag)
     );
 }
+
 function playOrderSound() {
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -344,11 +346,23 @@ async function submitOrder(e) {
         const earned = Math.floor(ft / 1000);
         const { data: profile } = await db.from('profiles').select('loyalty_points').eq('id', currentUser.id).single();
         if (profile) await db.from('profiles').update({ loyalty_points: (profile.loyalty_points || 0) + earned }).eq('id', currentUser.id);
+        
+        // حفظ المنتجات في order_items
+        const orderItems = cart.map(item => ({
+            order_id: data[0].id,
+            product_id: item.id,
+            product_name: item.name,
+            product_image: item.image_url || null,
+            qty: item.qty,
+            price: item.price
+        }));
+        await db.from('order_items').insert(orderItems);
+
         // --- بداية كود خصم المخزون (الاحترافي) ---
-for (const item of cart) {
-    await db.rpc('decrease_stock', { p_id: item.id, qty: item.qty });
-}
-// --- نهاية كود خصم المخزون --- 
+        for (const item of cart) {
+            await db.rpc('decrease_stock', { p_id: item.id, qty: item.qty });
+        }
+        // --- نهاية كود خصم المخزون --- 
         document.getElementById('invoiceId').textContent = '#' + data[0].id; 
         document.getElementById('checkoutModal').classList.remove('active'); 
         document.getElementById('invoiceModal').classList.add('active'); 
@@ -406,8 +420,40 @@ async function loadAdminData() {
     const { data: p } = await db.from('products').select('*'); 
     const { data: o } = await db.from('orders').select('*').order('created_at', { ascending: false });
     allProducts = p || []; allOrders = o || []; 
-    if (previousOrderCount > 0 && allOrders.length > previousOrderCount) { playOrderSound(); showToast('🔔 هناك طلب جديد ورد إلى المتجر الآن!', 'success'); }
+    
+    // 🔔 إشعار الطلب الجديد مع التفاصيل والصور
+    if (previousOrderCount > 0 && allOrders.length > previousOrderCount) { 
+        playOrderSound(); 
+        const newOrder = allOrders[0];
+        const { data: items } = await db.from('order_items').select('*').eq('order_id', newOrder.id);
+        
+        let productsHtml = '';
+        if (items && items.length > 0) {
+            productsHtml = items.map(i => `
+                <div style="display:flex; align-items:center; gap:10px; margin-top:8px; background:rgba(255,255,255,0.1); padding:5px; border-radius:5px;">
+                    ${i.product_image ? `<img src="${i.product_image}" style="width:40px; height:40px; object-fit:cover; border-radius:5px;">` : '<span style="font-size:24px;">📦</span>'}
+                    <span style="font-weight:bold;">${i.product_name} (الكمية: ${i.qty})</span>
+                </div>
+            `).join('');
+        }
+        
+        const toastEl = document.getElementById('toast');
+        toastEl.innerHTML = `
+            <div style="text-align:right; padding:5px;">
+                <div style="font-size:16px; font-weight:bold; margin-bottom:5px;">🔔 طلب جديد من: ${newOrder.customer_name}</div>
+                <div style="font-size:12px; color:#ddd; margin-bottom:5px;">📞 ${newOrder.customer_phone}</div>
+                ${productsHtml}
+            </div>
+        `;
+        toastEl.style.background = '#28a745';
+        toastEl.style.height = 'auto';
+        toastEl.style.minHeight = '80px';
+        toastEl.style.display = 'block';
+        toastEl.classList.add('show');
+        setTimeout(() => { toastEl.classList.remove('show'); toastEl.innerHTML = ''; toastEl.style.minHeight = 'auto'; }, 8000); // يختفي بعد 8 ثواني
+    }
     previousOrderCount = allOrders.length;
+    
     let ts = 0, totalStockCount = 0; 
     allOrders.forEach(x => { if(x.status !== 'rejected') ts += (x.total + (x.delivery_cost || 0)); });
     allProducts.forEach(prod => { totalStockCount += (prod.stock || 0); });
@@ -649,36 +695,36 @@ function shareProduct() {
     else { navigator.clipboard.writeText(url); showToast('تم نسخ رابط المنتج! 📋'); }
 }
 
-// الشريط المتحرك والأقسام والكوبونات
+// الشريط المتحرك (بأزرار تشغيل/إيقاف)
 async function loadMarquee() {
-    const { data } = await db.from('site_settings').select('marquee_text, marquee_start_time, marquee_end_time').eq('id', 1).single();
+    const { data } = await db.from('site_settings').select('marquee_text, marquee_active').eq('id', 1).single();
     if(data) {
-        const now = new Date();
-        const currentTime = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-        const start = data.marquee_start_time || '00:00';
-        const end = data.marquee_end_time || '23:59';
         const marqueeBar = document.getElementById('marqueeBar');
         if (marqueeBar) {
-            if (currentTime >= start && currentTime <= end) {
+            if (data.marquee_active === true) {
                 marqueeBar.style.display = 'block';
                 document.getElementById('marqueeText').textContent = data.marquee_text || '';
-            } else { marqueeBar.style.display = 'none'; }
+            } else {
+                marqueeBar.style.display = 'none';
+            }
         }
         const textInput = document.getElementById('marqueeTextInput'); if(textInput) textInput.value = data.marquee_text || '';
-        const startInput = document.getElementById('marqueeStart'); if(startInput) startInput.value = start;
-        const endInput = document.getElementById('marqueeEnd'); if(endInput) endInput.value = end;
     }
+}
+
+async function toggleMarquee(state) {
+    await db.from('site_settings').update({ marquee_active: state }).eq('id', 1);
+    showToast(state ? 'تم تشغيل الشريط' : 'تم إيقاف الشريط');
+    loadMarquee();
 }
 
 async function handleUpdateMarquee(e) {
     e.preventDefault();
     const text = document.getElementById('marqueeTextInput').value.trim();
-    const start = document.getElementById('marqueeStart').value;
-    const end = document.getElementById('marqueeEnd').value;
     const btn = document.getElementById('btnMarquee'); btn.disabled = true; btn.textContent = 'جاري الحفظ...';
-    const { error } = await db.from('site_settings').update({ marquee_text: text, marquee_start_time: start, marquee_end_time: end }).eq('id', 1);
+    const { error } = await db.from('site_settings').update({ marquee_text: text }).eq('id', 1);
     if(error) showToast('خطأ: ' + error.message, 'error');
-    else { showToast('تم تحديث الشريط!'); loadMarquee(); }
+    else { showToast('تم تحديث النص!'); loadMarquee(); }
     btn.disabled = false; btn.textContent = 'حفظ النص';
 }
 
