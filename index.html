@@ -305,8 +305,8 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
                     <form onsubmit="handleUpdateMarquee(event)">
                         <textarea id="marqueeTextInput" class="form-control" placeholder="اكتب هنا النص الذي سيظهر متحركاً" rows="3" required></textarea>
                         <div style="display:flex; gap:10px; margin-bottom:15px;">
-                            <div style="flex:1;"><label style="font-weight:bold; font-size:0.85rem;">وقت التشغيل:</label><input type="time" id="marqueeStart" class="form-control" required></div>
-                            <div style="flex:1;"><label style="font-weight:bold; font-size:0.85rem;">وقت الإيقاف:</label><input type="time" id="marqueeEnd" class="form-control" required></div>
+                            <button type="button" class="auth-btn" style="background:var(--green);" onclick="toggleMarquee(true)">▶️ تشغيل الشريط</button>
+                            <button type="button" class="auth-btn" style="background:var(--red);" onclick="toggleMarquee(false)">⏹️ إيقاف الشريط</button>
                         </div>
                         <button type="submit" class="auth-btn" id="btnMarquee" style="background:var(--orange);">حفظ النص</button>
                     </form>
