@@ -6,6 +6,7 @@ let currentUser = null, allProducts = [], allOrders = [], userWishlistIds = [], 
 let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let activeProductId = null, modalQty = 1, appliedDiscountAmount = 0, appliedCouponCode = "";
 let previousOrderCount = 0, userPoints = 0;
+let salesChartInstance = null; // متغير للرسم البياني
 
 // --- دالة حماية من XSS ---
 function escapeHTML(str) {
@@ -84,7 +85,6 @@ function setUser(user) {
     const nav = document.getElementById('navActions');
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
-        // UID الخاص بك كمدير
         const isAdmin = user.id === '04a16772-0bf9-4acd-8007-ab7f1e085751';
         nav.innerHTML = `<button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
                          ${isAdmin ? `<button class="nav-btn nav-btn-login" onclick="showPage('admin')"><i class="fas fa-cog"></i> الإدارة</button>` : ''}
@@ -210,7 +210,9 @@ async function loadWishlistItems() {
     const wishProducts = allProducts.filter(p => userWishlistIds.includes(p.id));
     grid.innerHTML = wishProducts.map(p => `
         <div class="product-card" onclick="openProduct(${p.id})">
-            <div class="product-image" style="${p.image_url ? `background-image:url('${p.image_url}');` : ''}">${!p.image_url ? (p.icon || '📦') : ''}</div>
+            <div class="product-image" style="position:relative; overflow:hidden;">
+                ${p.image_url ? `<img src="${p.image_url}" loading="lazy" style="width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;">` : `<span style="font-size:4rem;">${p.icon || '📦'}</span>`}
+            </div>
             <div class="product-title">${p.name}</div>
             <div class="product-price">${Number(p.price).toLocaleString()} د.ع</div>
             <button class="add-to-cart" onclick="event.stopPropagation(); addToCart(${p.id})">أضف للسلة</button>
@@ -238,7 +240,9 @@ function renderProducts(list) {
         <div class="product-card" onclick="openProduct(${p.id})">
             ${badgeHtml}
             <button class="wishlist-btn ${isWish ? 'active' : ''}" onclick="toggleWishlist(${p.id}, event)"><i class="${isWish ? 'fas' : 'far'} fa-heart"></i></button>
-            <div class="product-image" style="${p.image_url ? `background-image:url('${p.image_url}');` : ''}">${!p.image_url ? (p.icon || '📦') : ''}</div>
+            <div class="product-image" style="position:relative; overflow:hidden;">
+                ${p.image_url ? `<img src="${p.image_url}" loading="lazy" style="width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;">` : `<span style="font-size:4rem;">${p.icon || '📦'}</span>`}
+            </div>
             <div class="product-title">${p.name}</div>
             <div style="color:#ffc107; font-size:0.8rem; margin-bottom:5px;">${'⭐'.repeat(Math.round(p.rating || 5))}</div>
             <div class="product-price">${priceHtml}</div>
@@ -271,8 +275,8 @@ async function openProduct(id) {
     const p = allProducts.find(x => x.id === id); if (!p) return;
     activeProductId = id; modalQty = 1; document.getElementById('modalQty').textContent = modalQty;
     const iconDiv = document.getElementById('modalIcon');
-    if (p.image_url) { iconDiv.style.backgroundImage = `url('${p.image_url}')`; iconDiv.textContent = ''; }
-    else { iconDiv.style.backgroundImage = 'none'; iconDiv.textContent = p.icon || '📦'; }
+    if (p.image_url) { iconDiv.innerHTML = `<img src="${p.image_url}" style="width:100%; height:100%; object-fit:cover; border-radius:10px;">`; }
+    else { iconDiv.innerHTML = `<span style="font-size:6rem;">${p.icon || '📦'}</span>`; }
     document.getElementById('modalTitle').textContent = p.name;
     let priceText = `${Number(p.price).toLocaleString('ar-IQ')} د.ع`;
     if(p.discount > 0) { let fp = Number(p.price) - (Number(p.price) * (p.discount / 100)); priceText = `<span class="old-price">${Number(p.price).toLocaleString('ar-IQ')}</span> ${fp.toLocaleString('ar-IQ')} د.ع`; }
@@ -415,11 +419,48 @@ async function loadProfileData() {
     document.getElementById('ordersList').innerHTML = data && data.length ? data.map(o => {
         let s1 = 'active', s2 = '', s3 = '', isRejected = o.status === 'rejected';
         if(isRejected) { s1 = ''; s2 = ''; s3 = ''; }
-        else { if(o.status === 'shipped') s2 = 'active'; if(o.status === 'delivered') { s2 = 'active'; s3 = 'active'; } }
-        let trackHtml = isRejected ? '<div style="color:var(--red); font-weight:bold; text-align:center; margin-top:10px;">❌ تم إلغاء الطلب</div>' : `<div class="status-track"><div class="status-step ${s1}"><div class="status-dot"></div>انتظار</div><div class="status-step ${s2}"><div class="status-dot"></div>توصيل (${o.delivery_time || 'قيد التحديد'})</div><div class="status-step ${s3}"><div class="status-dot"></div>تم</div></div>`;
+        else { 
+            if(o.status === 'shipped') s2 = 'active'; 
+            if(o.status === 'delivered') { s2 = 'active'; s3 = 'active'; } 
+        }
+        
+        // --- شريط تتبع الطلب الجديد (Timeline) ---
+        let trackHtml = isRejected 
+            ? '<div style="color:var(--red); font-weight:bold; text-align:center; margin-top:15px; padding:10px; background:#ffebee; border-radius:8px;"><i class="fas fa-times-circle"></i> تم إلغاء الطلب</div>' 
+            : `
+            <div style="margin-top:20px; background:var(--gray-light); padding:15px; border-radius:10px;">
+                <div style="display:flex; justify-content:space-between; position:relative;">
+                    <div style="position:absolute; top:15px; right:10%; left:10%; height:3px; background:var(--border); z-index:1;"></div>
+                    <div style="position:absolute; top:15px; right:10%; width:${s3 ? '80%' : (s2 ? '40%' : '0')}; height:3px; background:var(--green); z-index:1; transition:0.5s;"></div>
+                    
+                    <div style="text-align:center; z-index:2; width:33%;">
+                        <div style="width:30px; height:30px; border-radius:50%; background:var(--green); color:white; display:flex; align-items:center; justify-content:center; margin:0 auto 5px auto; font-size:14px; box-shadow:0 0 0 3px var(--white);">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <span style="font-size:0.8rem; font-weight:bold; color:var(--green);">تم الطلب</span>
+                    </div>
+                    
+                    <div style="text-align:center; z-index:2; width:33%;">
+                        <div style="width:30px; height:30px; border-radius:50%; background:${s2 ? 'var(--green)' : 'var(--border)'}; color:white; display:flex; align-items:center; justify-content:center; margin:0 auto 5px auto; font-size:14px; box-shadow:0 0 0 3px var(--white);">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <span style="font-size:0.8rem; font-weight:bold; color:${s2 ? 'var(--green)' : 'var(--gray)'};">${o.delivery_time || 'قيد التجهيز'}</span>
+                    </div>
+                    
+                    <div style="text-align:center; z-index:2; width:33%;">
+                        <div style="width:30px; height:30px; border-radius:50%; background:${s3 ? 'var(--green)' : 'var(--border)'}; color:white; display:flex; align-items:center; justify-content:center; margin:0 auto 5px auto; font-size:14px; box-shadow:0 0 0 3px var(--white);">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <span style="font-size:0.8rem; font-weight:bold; color:${s3 ? 'var(--green)' : 'var(--gray)'};">تم التوصيل</span>
+                    </div>
+                </div>
+            </div>`;
+        // ------------------------------------------
+
         let cancelBtnHtml = (o.status === 'pending') ? `<button onclick="userCancelOrder(${o.id})" class="btn-delete" style="margin-top:10px; width:100%;"><i class="fas fa-times-circle"></i> إلغاء الطلب الآن</button>` : '';
         let deliveryInfo = o.delivery_cost > 0 ? `<div style="margin-top:5px; color:var(--blue);">تكلفة التوصيل: ${Number(o.delivery_cost).toLocaleString()} د.ع (${o.delivery_time})</div>` : '';
-        return `<div style="background:white; padding:15px; border-radius:10px; margin-bottom:15px;"><div style="display:flex; justify-content:space-between; border-bottom:1px solid #ddd; padding-bottom:10px;"><b>طلب #${o.id}</b><b style="color:var(--orange)">الإجمالي: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</b></div>${deliveryInfo}${trackHtml}${cancelBtnHtml}</div>`;
+        
+        return `<div style="background:var(--white); padding:15px; border-radius:10px; margin-bottom:15px; border:1px solid var(--border);"><div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding-bottom:10px;"><b>طلب #${o.id}</b><b style="color:var(--orange)">الإجمالي: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</b></div>${deliveryInfo}${trackHtml}${cancelBtnHtml}</div>`;
     }).join('') : '<p>لا توجد طلبات.</p>';
 }
 
@@ -432,6 +473,7 @@ function switchAdminTab(tab) {
     });
     if(tab === 'categories') loadCategories();
     if(tab === 'coupons') loadCoupons();
+    if(tab === 'reports') renderSalesChart(); // تفعيل الرسم البياني
 }
 
 async function quickUpdateStock(productId, delta) {
@@ -496,12 +538,66 @@ async function loadAdminData() {
     renderAdminProducts(); 
     renderAdminOrders(allOrderItems); 
     renderLowStock(); loadCoupons();
+
+    // تحديث الرسم البياني إذا كانت صفحة التقارير مفتوحة
+    if(document.getElementById('adminReportsSection') && !document.getElementById('adminReportsSection').classList.contains('hidden')) {
+        renderSalesChart();
+    }
+}
+
+// --- دالة رسم المبيعات (Chart.js) ---
+function renderSalesChart() {
+    if (typeof Chart === 'undefined') return; // التأكد من تحميل المكتبة
+    const canvas = document.getElementById('salesChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // تجميع مبيعات آخر 7 أيام
+    const last7Days = [...Array(7)].map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        return d.toISOString().split('T')[0];
+    });
+    
+    const salesData = last7Days.map(date => {
+        return allOrders.filter(o => o.created_at && o.created_at.startsWith(date) && o.status !== 'rejected')
+                        .reduce((sum, o) => sum + Number(o.total), 0);
+    });
+
+    if (salesChartInstance) {
+        salesChartInstance.destroy(); // مسح الرسمة القديمة
+    }
+
+    salesChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: last7Days.map(d => d.slice(5)), // يعرض الشهر-اليوم فقط
+            datasets: [{
+                label: 'المبيعات (د.ع)',
+                data: salesData,
+                borderColor: '#fea621',
+                backgroundColor: 'rgba(254, 166, 33, 0.2)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
 }
 
 function renderAdminProducts() {
     const t = document.getElementById('adminProductSearch').value.toLowerCase();
     document.getElementById('adminProductsList').innerHTML = allProducts.filter(p => p.name.toLowerCase().includes(t)).map(p => `
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding:10px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;">
             <div><b>${p.name}</b> - ${Number(p.price).toLocaleString()} د.ع <br><small>المخزون الحالي: <strong style="color:var(--orange)">${p.stock || 0}</strong> قطعة</small></div>
             <div style="display:flex; gap:5px; align-items:center;">
                 <button onclick="quickUpdateStock(${p.id}, -1)" class="btn-stock">-</button>
@@ -535,7 +631,6 @@ function renderAdminOrders(allOrderItems = []) {
     const t = document.getElementById('adminOrderSearch').value.toLowerCase();
     document.getElementById('adminOrdersList').innerHTML = allOrders.filter(o => o.customer_name.toLowerCase().includes(t) || o.customer_phone.includes(t)).map(o => {
         
-        // تفاصيل المنتجات داخل الطلب
         const orderItems = allOrderItems.filter(i => i.order_id == o.id);
         let itemsHtml = '';
         
@@ -725,148 +820,4 @@ async function submitNewProduct(e) {
 }
 
 // الطلب السريع
-function openQuickOrder(productId) {
-    if (!currentUser) { showToast('سجل دخول أولاً للطلب السريع', 'error'); showPage('auth'); return; }
-    const p = allProducts.find(x => x.id === productId);
-    if (!p || p.stock <= 0) { showToast('المنتج غير متوفر', 'error'); return; }
-    document.getElementById('quickOrderProductId').value = productId;
-    document.getElementById('quickOrderProductName').textContent = p.name;
-    document.getElementById('quickPrice').textContent = Number(p.price).toLocaleString('ar-IQ') + ' د.ع';
-    document.getElementById('quickName').value = currentUser.user_metadata?.full_name || '';
-    document.getElementById('quickOrderModal').classList.add('active');
-}
-
-async function submitQuickOrder(e) {
-    e.preventDefault();
-    const btn = document.getElementById('btnQuickOrder'); btn.disabled = true;
-    const pid = document.getElementById('quickOrderProductId').value;
-    const p = allProducts.find(x => x.id === parseInt(pid));
-    let finalPrice = Number(p.price); if(p.discount > 0) finalPrice -= (finalPrice * (p.discount / 100));
-    const { error } = await db.from('orders').insert([{ 
-        user_id: currentUser.id, total: finalPrice, status: 'pending', 
-        customer_name: document.getElementById('quickName').value, 
-        customer_phone: document.getElementById('quickPhone').value, 
-        customer_address: document.getElementById('quickAddress').value, 
-        delivery_cost: 0, delivery_time: 'قيد التحديد'
-    }]).select();
-    if (error) { showToast(error.message, 'error'); btn.disabled = false; }
-    else {
-        const earned = Math.floor(finalPrice / 1000);
-        const { data: profile } = await db.from('profiles').select('loyalty_points').eq('id', currentUser.id).single();
-        if (profile) await db.from('profiles').update({ loyalty_points: (profile.loyalty_points || 0) + earned }).eq('id', currentUser.id);
-        showToast('تم استلام طلبك السريع! 🎉'); closeModal('quickOrderModal'); btn.disabled = false;
-    }
-}
-
-// مشاركة المنتج
-function shareProduct() {
-    const p = allProducts.find(x => x.id === activeProductId);
-    if (!p) return;
-    const url = window.location.origin + window.location.pathname + '?product=' + p.id;
-    if (navigator.share) { navigator.share({ title: p.name, text: 'شاهد هذا المنتج في متجر يساعدكم!', url: url }); } 
-    else { navigator.clipboard.writeText(url); showToast('تم نسخ رابط المنتج! 📋'); }
-}
-
-// الشريط المتحرك (بأزرار تشغيل/إيقاف)
-async function loadMarquee() {
-    const { data } = await db.from('site_settings').select('marquee_text, marquee_active').eq('id', 1).single();
-    if(data) {
-        const marqueeBar = document.getElementById('marqueeBar');
-        if (marqueeBar) {
-            if (data.marquee_active === true) {
-                marqueeBar.style.display = 'block';
-                document.getElementById('marqueeText').textContent = data.marquee_text || '';
-            } else {
-                marqueeBar.style.display = 'none';
-            }
-        }
-        const textInput = document.getElementById('marqueeTextInput'); if(textInput) textInput.value = data.marquee_text || '';
-    }
-}
-
-async function toggleMarquee(state) {
-    await db.from('site_settings').update({ marquee_active: state }).eq('id', 1);
-    showToast(state ? 'تم تشغيل الشريط' : 'تم إيقاف الشريط');
-    loadMarquee();
-}
-
-async function handleUpdateMarquee(e) {
-    e.preventDefault();
-    const text = document.getElementById('marqueeTextInput').value.trim();
-    const btn = document.getElementById('btnMarquee'); btn.disabled = true; btn.textContent = 'جاري الحفظ...';
-    const { error } = await db.from('site_settings').update({ marquee_text: text }).eq('id', 1);
-    if(error) showToast('خطأ: ' + error.message, 'error');
-    else { showToast('تم تحديث النص!'); loadMarquee(); }
-    btn.disabled = false; btn.textContent = 'حفظ النص';
-}
-
-async function loadCategories() {
-    const { data } = await db.from('categories').select('*').order('id', { ascending: false });
-    
-    // 1. عرض الأقسام في لوحة الإدارة (زي ما كانت)
-    const list = document.getElementById('categoriesList'); 
-    if(list) {
-        list.innerHTML = data && data.length ? data.map(c => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;"><span>${c.name}</span><button onclick="deleteCategory(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button></div>`).join('') : '<p>لا توجد أقسام حالياً.</p>';
-    }
-    
-    // 2. عرض الأقسام في المتجر للزبون (هذا الجديد)
-    const filterBar = document.getElementById('categoryFilterBar');
-    if(filterBar) {
-        filterBar.innerHTML = `<button class="nav-btn nav-btn-login active" onclick="filterByCategory('all', this)">الكل</button>` + 
-        (data || []).map(c => `<button class="nav-btn nav-btn-login" onclick="filterByCategory('${c.name}', this)">${c.name}</button>`).join('');
-    }
-
-    // 3. تعبئة القائمة المنسدلة في لوحة الإدارة
-    const select = document.getElementById('pCategory');
-    if(select) { 
-        select.innerHTML = '<option value="">-- اختر القسم --</option>' + (data || []).map(c => `<option value="${c.name}">${c.name}</option>`).join(''); 
-    }
-}
-
-async function submitNewCategory(e) {
-    e.preventDefault(); const name = document.getElementById('newCategoryName').value.trim(); if(!name) return;
-    const { error } = await db.from('categories').insert([{ name: name }]);
-    if(error) showToast('خطأ: ' + error.message, 'error');
-    else { showToast('تمت إضافة القسم!'); document.getElementById('newCategoryName').value = ''; loadCategories(); }
-}
-
-async function deleteCategory(id) {
-    if(!confirm('حذف هذا القسم؟')) return;
-    const { error } = await db.from('categories').delete().eq('id', id);
-    if(error) showToast('خطأ: ' + error.message, 'error'); else { showToast('تم حذف القسم'); loadCategories(); }
-}
-
-async function loadCoupons() {
-    const { data } = await db.from('coupons').select('*').order('id', { ascending: false });
-    const list = document.getElementById('couponsList'); if(!list) return;
-    list.innerHTML = data && data.length ? data.map(c => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;"><div><b style="color:var(--orange);">${c.code}</b> - خصم ${c.discount_percent}%<br><small style="color:${c.used_count >= c.max_uses ? 'var(--red)' : 'var(--gray)'};">تم استخدام: ${c.used_count} من ${c.max_uses} ${c.used_count >= c.max_uses ? '(منتهي)' : ''}</small></div><button onclick="deleteCoupon(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button></div>`).join('') : '<p>لا توجد أكواد خصم حالياً.</p>';
-}
-
-async function submitNewCoupon(e) {
-    e.preventDefault();
-    const code = document.getElementById('couponCodeInput').value.trim().toUpperCase();
-    const percent = parseInt(document.getElementById('couponPercent').value);
-    const maxUses = parseInt(document.getElementById('couponMaxUses').value);
-    const { error } = await db.from('coupons').insert([{ code: code, discount_percent: percent, max_uses: maxUses }]);
-    if(error) showToast('خطأ: ' + (error.message.includes('duplicate') ? 'هذا الكود موجود مسبقاً' : error.message), 'error');
-    else { showToast('تم إنشاء كود الخصم! 🎟️'); document.getElementById('couponCodeInput').value = ''; loadCoupons(); }
-}
-
-async function deleteCoupon(id) {
-    if(!confirm('حذف كود الخصم؟')) return;
-    const { error } = await db.from('coupons').delete().eq('id', id);
-    if(error) showToast('خطأ: ' + error.message, 'error'); else { showToast('تم الحذف'); loadCoupons(); }
-}
-
-function showToast(m, t = 'success') { const el = document.getElementById('toast'); el.textContent = m; el.style.background = t === 'error' ? '#dc3545' : '#28a745'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
-
-document.addEventListener('DOMContentLoaded', () => { 
-    // تفعيل الثيم المحفوظ
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    const icon = document.getElementById('themeIcon');
-    if(icon) icon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-
-    initAuth(); loadProducts(); loadMarquee(); loadCategories();
-    setInterval(() => { if (currentUser && currentUser.id === '04a16772-0bf9-4acd-8007-ab7f1e085751') { loadAdminData(); } }, 30000);
-});
+fu
