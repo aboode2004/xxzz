@@ -7,6 +7,7 @@ let cart = JSON.parse(localStorage.getItem('cart') || '[]');
 let activeProductId = null, modalQty = 1, appliedDiscountAmount = 0, appliedCouponCode = "";
 let previousOrderCount = 0, userPoints = 0;
 
+// --- دالة حماية من XSS ---
 function escapeHTML(str) {
     if (typeof str !== 'string') return str;
     return str.replace(/[&<>'"]/g, 
@@ -73,6 +74,7 @@ function setUser(user) {
     const nav = document.getElementById('navActions');
     if (user) {
         const username = user.user_metadata?.username || 'مستخدم';
+        // UID الخاص بك كمدير
         const isAdmin = user.id === '04a16772-0bf9-4acd-8007-ab7f1e085751';
         nav.innerHTML = `<button class="nav-btn" onclick="showPage('profile')"><i class="fas fa-user"></i> ${username}</button>
                          ${isAdmin ? `<button class="nav-btn nav-btn-login" onclick="showPage('admin')"><i class="fas fa-cog"></i> الإدارة</button>` : ''}
@@ -358,7 +360,7 @@ async function submitOrder(e) {
         }));
         await db.from('order_items').insert(orderItems);
 
-        // --- بداية كود خصم المخزون (الاحترافي) ---
+        // --- كود خصم المخزون (الاحترافي) ---
         for (const item of cart) {
             await db.rpc('decrease_stock', { p_id: item.id, qty: item.qty });
         }
@@ -419,17 +421,17 @@ async function quickUpdateStock(productId, delta) {
 async function loadAdminData() {
     const { data: p } = await db.from('products').select('*'); 
     const { data: o } = await db.from('orders').select('*').order('created_at', { ascending: false });
-    const { data: items } = await db.from('order_items').select('*'); // جلب المنتجات المطلوبة
+    const { data: items } = await db.from('order_items').select('*');
     
     allProducts = p || []; 
     allOrders = o || []; 
-    const allOrderItems = items || []; // تخزينها
+    const allOrderItems = items || [];
     
-    // 🔔 إشعار الطلب الجديد مع التفاصيل والصور
+    // إشعار الطلب الجديد
     if (previousOrderCount > 0 && allOrders.length > previousOrderCount) { 
         playOrderSound(); 
         const newOrder = allOrders[0];
-        const newItems = allOrderItems.filter(i => i.order_id === newOrder.id);
+        const newItems = allOrderItems.filter(i => i.order_id == newOrder.id);
         
         let productsHtml = '';
         if (newItems.length > 0) {
@@ -454,7 +456,7 @@ async function loadAdminData() {
         toastEl.style.minHeight = '80px';
         toastEl.style.display = 'block';
         toastEl.classList.add('show');
-        setTimeout(() => { toastEl.classList.remove('show'); toastEl.innerHTML = ''; toastEl.style.minHeight = 'auto'; }, 8000);
+        setTimeout(() => { toastEl.classList.remove('show'); toastEl.innerHTML = ''; toastEl.style.minHeight = 'auto'; }, 8000); 
     }
     previousOrderCount = allOrders.length;
     
@@ -466,7 +468,6 @@ async function loadAdminData() {
     document.getElementById('statProductsCount').textContent = allProducts.length;
     document.getElementById('statTotalStock').textContent = totalStockCount;
     
-    // نمرر المنتجات للدالة عشان تعرضها
     renderAdminProducts(); 
     renderAdminOrders(allOrderItems); 
     renderLowStock(); loadCoupons();
@@ -509,27 +510,31 @@ function renderAdminOrders(allOrderItems = []) {
     const t = document.getElementById('adminOrderSearch').value.toLowerCase();
     document.getElementById('adminOrdersList').innerHTML = allOrders.filter(o => o.customer_name.toLowerCase().includes(t) || o.customer_phone.includes(t)).map(o => {
         
-        // جلب منتجات هذا الطلب
-        const orderItems = allOrderItems.filter(i => i.order_id === o.id);
+        // تفاصيل المنتجات داخل الطلب
+        const orderItems = allOrderItems.filter(i => i.order_id == o.id);
         let itemsHtml = '';
+        
         if (orderItems.length > 0) {
-            // قائمة منسدلة تحتوي على الصور والأسماء
             itemsHtml = `
-                <details style="margin-top:10px; background:#fff8ec; padding:10px; border-radius:8px; border:1px solid #ffe4b5;">
-                    <summary style="cursor:pointer; font-weight:bold; color:var(--orange); font-size:0.9rem;">
-                        🛒 عرض المنتجات المطلوبة (${orderItems.length})
-                    </summary>
-                    <div style="margin-top:10px; display:flex; flex-direction:column; gap:5px;">
+                <div style="margin-top:15px; padding:10px; background:#f9f9f9; border-radius:8px; border:1px dashed #ccc;">
+                    <p style="font-weight:bold; margin-bottom:8px; color:var(--purple-dark); font-size:0.9rem;">🛍️ المنتجات المطلوبة:</p>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
                         ${orderItems.map(item => `
-                            <div style="display:flex; align-items:center; gap:10px; background:white; padding:5px; border-radius:5px;">
-                                ${item.product_image ? `<img src="${item.product_image}" style="width:35px;height:35px;object-fit:cover;border-radius:5px;">` : '<span style="font-size:20px;">📦</span>'}
-                                <span style="font-size:0.85rem; font-weight:bold;">${item.product_name}</span>
-                                <span style="font-size:0.85rem; color:var(--gray);">الكمية: ${item.qty}</span>
+                            <div style="display:flex; align-items:center; gap:10px; background:white; padding:5px; border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                                ${item.product_image ? `<img src="${item.product_image}" style="width:40px;height:40px;object-fit:cover;border-radius:5px;">` : '<span style="font-size:24px; padding:0 5px;">📦</span>'}
+                                <div>
+                                    <div style="font-size:0.9rem; font-weight:bold;">${escapeHTML(item.product_name)}</div>
+                                    <div style="font-size:0.8rem; color:var(--orange);">الكمية: ${item.qty}</div>
+                                </div>
                             </div>
                         `).join('')}
                     </div>
-                </details>
+                </div>
             `;
+        } else {
+            itemsHtml = `<div style="margin-top:15px; padding:10px; background:#fff3f3; border-radius:8px; border:1px solid #ffcccc; color:var(--red); font-size:0.85rem; text-align:center;">
+                ⚠️ تفاصيل المنتجات غير متوفرة لهذا الطلب (لأنه طلب قديم).
+            </div>`;
         }
 
         let actions = '';
@@ -546,6 +551,7 @@ function renderAdminOrders(allOrderItems = []) {
             actions = `<button onclick="printShippingLabel(${o.id})" class="btn-edit" style="background:var(--purple-dark);"><i class="fas fa-print"></i> طباعة البوليصة</button>
                        <span style="color:var(--green); font-size:0.8rem; margin-right:5px;">مكتمل</span>`;
         }
+        
         return `<div class="order-card">
                     <div class="order-header"><span>#${o.id}</span><span>المجموع: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</span></div>
                     <div class="order-details">
