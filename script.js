@@ -21,6 +21,16 @@ function escapeHTML(str) {
     );
 }
 
+// --- دالة الوضع الليلي والنهاري ---
+function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    const icon = document.getElementById('themeIcon');
+    if(icon) icon.className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+}
+
 function playOrderSound() {
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -241,6 +251,21 @@ function renderProducts(list) {
 function filterProducts() { const term = document.getElementById('searchInput').value.toLowerCase(); renderProducts(allProducts.filter(p => p.name.toLowerCase().includes(term))); }
 function filterByPrice(type) { let s = [...allProducts]; if(type === 'low') s.sort((a, b) => Number(a.price) - Number(b.price)); if(type === 'high') s.sort((a, b) => Number(b.price) - Number(a.price)); renderProducts(s); }
 function filterByRating() { let s = [...allProducts]; s.sort((a, b) => (b.rating || 0) - (a.rating || 0)); renderProducts(s); }
+
+// --- دالة فلترة المنتجات حسب القسم ---
+function filterByCategory(categoryName, btnElement) {
+    if(btnElement) {
+        document.querySelectorAll('#categoryFilterBar .nav-btn').forEach(b => b.classList.remove('active'));
+        btnElement.classList.add('active');
+    }
+
+    if (!categoryName || categoryName === 'all') {
+        renderProducts(allProducts);
+    } else {
+        const filtered = allProducts.filter(p => p.category === categoryName);
+        renderProducts(filtered);
+    }
+}
 
 async function openProduct(id) {
     const p = allProducts.find(x => x.id === id); if (!p) return;
@@ -777,10 +802,25 @@ async function handleUpdateMarquee(e) {
 
 async function loadCategories() {
     const { data } = await db.from('categories').select('*').order('id', { ascending: false });
-    const list = document.getElementById('categoriesList'); if(!list) return;
-    list.innerHTML = data && data.length ? data.map(c => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;"><span>${c.name}</span><button onclick="deleteCategory(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button></div>`).join('') : '<p>لا توجد أقسام حالياً.</p>';
+    
+    // 1. عرض الأقسام في لوحة الإدارة (زي ما كانت)
+    const list = document.getElementById('categoriesList'); 
+    if(list) {
+        list.innerHTML = data && data.length ? data.map(c => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding:10px 0;"><span>${c.name}</span><button onclick="deleteCategory(${c.id})" class="btn-delete"><i class="fas fa-trash"></i></button></div>`).join('') : '<p>لا توجد أقسام حالياً.</p>';
+    }
+    
+    // 2. عرض الأقسام في المتجر للزبون (هذا الجديد)
+    const filterBar = document.getElementById('categoryFilterBar');
+    if(filterBar) {
+        filterBar.innerHTML = `<button class="nav-btn nav-btn-login active" onclick="filterByCategory('all', this)">الكل</button>` + 
+        (data || []).map(c => `<button class="nav-btn nav-btn-login" onclick="filterByCategory('${c.name}', this)">${c.name}</button>`).join('');
+    }
+
+    // 3. تعبئة القائمة المنسدلة في لوحة الإدارة
     const select = document.getElementById('pCategory');
-    if(select) { select.innerHTML = '<option value="">-- اختر القسم --</option>' + (data || []).map(c => `<option value="${c.name}">${c.name}</option>`).join(''); }
+    if(select) { 
+        select.innerHTML = '<option value="">-- اختر القسم --</option>' + (data || []).map(c => `<option value="${c.name}">${c.name}</option>`).join(''); 
+    }
 }
 
 async function submitNewCategory(e) {
@@ -821,6 +861,12 @@ async function deleteCoupon(id) {
 function showToast(m, t = 'success') { const el = document.getElementById('toast'); el.textContent = m; el.style.background = t === 'error' ? '#dc3545' : '#28a745'; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
 
 document.addEventListener('DOMContentLoaded', () => { 
+    // تفعيل الثيم المحفوظ
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    const icon = document.getElementById('themeIcon');
+    if(icon) icon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+
     initAuth(); loadProducts(); loadMarquee(); loadCategories();
     setInterval(() => { if (currentUser && currentUser.id === '04a16772-0bf9-4acd-8007-ab7f1e085751') { loadAdminData(); } }, 30000);
 });
