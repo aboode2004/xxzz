@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>يساعدكم | متجر نينوى الإلكتروني</title>
+<!-- إضافة PWA -->
+<link rel="manifest" href="manifest.json">
+<!-- مكتبة الرسوم البيانية -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <style>
@@ -357,6 +362,11 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
         </div>
 
         <div id="adminReportsSection" class="hidden">
+            <!-- مكان الرسم البياني الجديد -->
+            <div style="background:var(--white); padding:20px; border-radius:15px; margin-bottom:20px;">
+                <h3 style="color:var(--purple-dark); margin-bottom:15px;"><i class="fas fa-chart-line"></i> رسم بياني للمبيعات</h3>
+                <canvas id="salesChart" height="100"></canvas>
+            </div>
             <div style="background:var(--white); padding:20px; border-radius:15px; margin-bottom:20px;">
                 <h3 style="color:var(--red); margin-bottom:15px;"><i class="fas fa-exclamation-triangle"></i> تنبيهات المخزون المنخفض (أقل من 5 قطع)</h3>
                 <div id="lowStockList"></div>
@@ -508,5 +518,13 @@ body{font-family:'Cairo',sans-serif;background:var(--gray-light);color:var(--bla
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
+<script>
+// تسجيل Service Worker لتفعيل الـ PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+  });
+}
+</script>
 </body>
 </html>
