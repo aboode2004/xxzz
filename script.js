@@ -419,17 +419,21 @@ async function quickUpdateStock(productId, delta) {
 async function loadAdminData() {
     const { data: p } = await db.from('products').select('*'); 
     const { data: o } = await db.from('orders').select('*').order('created_at', { ascending: false });
-    allProducts = p || []; allOrders = o || []; 
+    const { data: items } = await db.from('order_items').select('*'); // جلب المنتجات المطلوبة
+    
+    allProducts = p || []; 
+    allOrders = o || []; 
+    const allOrderItems = items || []; // تخزينها
     
     // 🔔 إشعار الطلب الجديد مع التفاصيل والصور
     if (previousOrderCount > 0 && allOrders.length > previousOrderCount) { 
         playOrderSound(); 
         const newOrder = allOrders[0];
-        const { data: items } = await db.from('order_items').select('*').eq('order_id', newOrder.id);
+        const newItems = allOrderItems.filter(i => i.order_id === newOrder.id);
         
         let productsHtml = '';
-        if (items && items.length > 0) {
-            productsHtml = items.map(i => `
+        if (newItems.length > 0) {
+            productsHtml = newItems.map(i => `
                 <div style="display:flex; align-items:center; gap:10px; margin-top:8px; background:rgba(255,255,255,0.1); padding:5px; border-radius:5px;">
                     ${i.product_image ? `<img src="${i.product_image}" style="width:40px; height:40px; object-fit:cover; border-radius:5px;">` : '<span style="font-size:24px;">📦</span>'}
                     <span style="font-weight:bold;">${i.product_name} (الكمية: ${i.qty})</span>
@@ -450,7 +454,7 @@ async function loadAdminData() {
         toastEl.style.minHeight = '80px';
         toastEl.style.display = 'block';
         toastEl.classList.add('show');
-        setTimeout(() => { toastEl.classList.remove('show'); toastEl.innerHTML = ''; toastEl.style.minHeight = 'auto'; }, 8000); // يختفي بعد 8 ثواني
+        setTimeout(() => { toastEl.classList.remove('show'); toastEl.innerHTML = ''; toastEl.style.minHeight = 'auto'; }, 8000);
     }
     previousOrderCount = allOrders.length;
     
@@ -461,7 +465,11 @@ async function loadAdminData() {
     document.getElementById('statSales').textContent = ts.toLocaleString();
     document.getElementById('statProductsCount').textContent = allProducts.length;
     document.getElementById('statTotalStock').textContent = totalStockCount;
-    renderAdminProducts(); renderAdminOrders(); renderLowStock(); loadCoupons();
+    
+    // نمرر المنتجات للدالة عشان تعرضها
+    renderAdminProducts(); 
+    renderAdminOrders(allOrderItems); 
+    renderLowStock(); loadCoupons();
 }
 
 function renderAdminProducts() {
@@ -497,9 +505,33 @@ function printShippingLabel(orderId) {
     printArea.style.display = 'block'; window.print(); printArea.style.display = 'none';
 }
 
-function renderAdminOrders() {
+function renderAdminOrders(allOrderItems = []) {
     const t = document.getElementById('adminOrderSearch').value.toLowerCase();
     document.getElementById('adminOrdersList').innerHTML = allOrders.filter(o => o.customer_name.toLowerCase().includes(t) || o.customer_phone.includes(t)).map(o => {
+        
+        // جلب منتجات هذا الطلب
+        const orderItems = allOrderItems.filter(i => i.order_id === o.id);
+        let itemsHtml = '';
+        if (orderItems.length > 0) {
+            // قائمة منسدلة تحتوي على الصور والأسماء
+            itemsHtml = `
+                <details style="margin-top:10px; background:#fff8ec; padding:10px; border-radius:8px; border:1px solid #ffe4b5;">
+                    <summary style="cursor:pointer; font-weight:bold; color:var(--orange); font-size:0.9rem;">
+                        🛒 عرض المنتجات المطلوبة (${orderItems.length})
+                    </summary>
+                    <div style="margin-top:10px; display:flex; flex-direction:column; gap:5px;">
+                        ${orderItems.map(item => `
+                            <div style="display:flex; align-items:center; gap:10px; background:white; padding:5px; border-radius:5px;">
+                                ${item.product_image ? `<img src="${item.product_image}" style="width:35px;height:35px;object-fit:cover;border-radius:5px;">` : '<span style="font-size:20px;">📦</span>'}
+                                <span style="font-size:0.85rem; font-weight:bold;">${item.product_name}</span>
+                                <span style="font-size:0.85rem; color:var(--gray);">الكمية: ${item.qty}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </details>
+            `;
+        }
+
         let actions = '';
         if(o.status === 'pending') {
             actions = `<button onclick="openDeliveryModal(${o.id})" class="btn-accept"><i class="fas fa-check"></i> قبول وتحديد التوصيل</button>
@@ -514,7 +546,16 @@ function renderAdminOrders() {
             actions = `<button onclick="printShippingLabel(${o.id})" class="btn-edit" style="background:var(--purple-dark);"><i class="fas fa-print"></i> طباعة البوليصة</button>
                        <span style="color:var(--green); font-size:0.8rem; margin-right:5px;">مكتمل</span>`;
         }
-        return `<div class="order-card"><div class="order-header"><span>#${o.id}</span><span>المجموع: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</span></div><div class="order-details"><div><b>الزبون:</b> ${o.customer_name} - ${o.customer_phone}</div><div><b>العنوان:</b> ${o.customer_address}</div><div><b>التوصيل:</b> ${o.delivery_cost ? o.delivery_cost + ' د.ع (' + o.delivery_time + ')' : 'لم يحدد بعد'}</div></div><div class="order-actions">${actions}</div></div>`;
+        return `<div class="order-card">
+                    <div class="order-header"><span>#${o.id}</span><span>المجموع: ${(o.total + (o.delivery_cost || 0)).toLocaleString()} د.ع</span></div>
+                    <div class="order-details">
+                        <div><b>الزبون:</b> ${o.customer_name} - ${o.customer_phone}</div>
+                        <div><b>العنوان:</b> ${o.customer_address}</div>
+                        <div><b>التوصيل:</b> ${o.delivery_cost ? o.delivery_cost + ' د.ع (' + o.delivery_time + ')' : 'لم يحدد بعد'}</div>
+                    </div>
+                    ${itemsHtml}
+                    <div class="order-actions">${actions}</div>
+                </div>`;
     }).join('');
 }
 
