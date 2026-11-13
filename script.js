@@ -965,3 +965,30 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth(); loadProducts(); loadMarquee(); loadCategories();
     setInterval(() => { if (currentUser && currentUser.id === '04a16772-0bf9-4acd-8007-ab7f1e085751') { loadAdminData(); } }, 30000);
 });
+// ====================================================
+// كود القائمة الجانبية (مضاف في النهاية دون تغيير الكود الأصلي)
+// ====================================================
+document.addEventListener('DOMContentLoaded', function() {
+    const kdMenuBtn = document.getElementById('kdMenuBtn');
+    const kdSidebar = document.getElementById('kdSidebar');
+    const kdMenuOverlay = document.getElementById('kdMenuOverlay');
+    const kdCloseBtn = document.getElementById('kdCloseBtn');
+
+    if (kdMenuBtn && kdSidebar && kdMenuOverlay && kdCloseBtn) {
+        window.openKdMenu = function() {
+            kdSidebar.style.right = '0';
+            kdMenuOverlay.style.display = 'block';
+            setTimeout(() => { kdMenuOverlay.style.opacity = '1'; }, 10);
+        }
+
+        window.closeKdMenu = function() {
+            kdSidebar.style.right = '-100%';
+            kdMenuOverlay.style.opacity = '0';
+            setTimeout(() => { kdMenuOverlay.style.display = 'none'; }, 300);
+        }
+
+        kdMenuBtn.addEventListener('click', window.openKdMenu);
+        kdCloseBtn.addEventListener('click', window.closeKdMenu);
+        kdMenuOverlay.addEventListener('click', window.closeKdMenu);
+    }
+});
