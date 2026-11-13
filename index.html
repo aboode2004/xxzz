@@ -526,5 +526,60 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+    <!-- زر فتح القائمة -->
+<button id="kdMenuBtn" style="position:fixed; bottom: 90px; left: 20px; width: 55px; height: 55px; background: var(--orange); color: white; border: none; border-radius: 50%; font-size: 1.5rem; cursor: pointer; z-index: 5500; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
+    <i class="fas fa-bars"></i>
+</button>
+
+<!-- الطبقة المظلمة -->
+<div id="kdMenuOverlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9998; display: none; opacity: 0; transition: opacity 0.3s;"></div>
+
+<!-- القائمة الجانبية -->
+<div id="kdSidebar" style="position: fixed; top: 0; right: -100%; width: 85%; max-width: 350px; height: 100vh; background: #f39c12; z-index: 9999; transition: right 0.3s ease; box-shadow: -2px 0 10px rgba(0,0,0,0.2); display: flex; flex-direction: column; overflow-y: auto;">
+    
+    <!-- رأس القائمة -->
+    <div style="padding: 15px 20px; background: rgb(16,2,35); display: flex; justify-content: space-between; align-items: center; color: white;">
+        <span style="font-size: 1.5rem; font-weight: 900; color: var(--orange);">KD <small style="font-size: 0.8rem; color: white;">kd1s.com</small></span>
+        <button id="kdCloseBtn" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;"><i class="fas fa-times"></i></button>
+    </div>
+    
+    <!-- الروابط المطلوبة فقط -->
+    <ul style="list-style: none; padding: 0; margin: 0; flex: 1;">
+        <!-- تسجيل الدخول -->
+        <li style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+            <a href="#" onclick="showPage('auth'); switchAuthTab('login'); closeKdMenu(); return false;" style="display: flex; align-items: center; padding: 15px 20px; color: white; text-decoration: none; font-weight: bold; font-size: 1rem;">
+                <i class="fas fa-user" style="margin-left: 15px; width: 20px; text-align: center;"></i> تسجيل الدخول
+            </a>
+        </li>
+        
+        <!-- انشاء حساب -->
+        <li style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+            <a href="#" onclick="showPage('auth'); switchAuthTab('signup'); closeKdMenu(); return false;" style="display: flex; align-items: center; padding: 15px 20px; color: white; text-decoration: none; font-weight: bold; font-size: 1rem;">
+                <i class="fas fa-user-plus" style="margin-left: 15px; width: 20px; text-align: center;"></i> انشاء حساب
+            </a>
+        </li>
+        
+        <!-- شروط الإستخدام (تربط بصفحة من نحن) -->
+        <li style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+            <a href="#" onclick="showPage('about'); closeKdMenu(); return false;" style="display: flex; align-items: center; padding: 15px 20px; color: white; text-decoration: none; font-weight: bold; font-size: 1rem;">
+                <i class="fas fa-file-contract" style="margin-left: 15px; width: 20px; text-align: center;"></i> شروط الإستخدام
+            </a>
+        </li>
+        
+        <!-- سياسة الاسترجاع (تربط بصفحة من نحن) -->
+        <li style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+            <a href="#" onclick="showPage('about'); closeKdMenu(); return false;" style="display: flex; align-items: center; padding: 15px 20px; color: white; text-decoration: none; font-weight: bold; font-size: 1rem;">
+                <i class="fas fa-undo" style="margin-left: 15px; width: 20px; text-align: center;"></i> سياسة الاسترجاع
+            </a>
+        </li>
+        
+        <!-- الإتصال بنا (يفتح الواتساب الخاص بك) -->
+        <li style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+            <a href="https://wa.me/9647725372995" target="_blank" onclick="closeKdMenu();" style="display: flex; align-items: center; padding: 15px 20px; color: white; text-decoration: none; font-weight: bold; font-size: 1rem;">
+                <i class="fas fa-headset" style="margin-left: 15px; width: 20px; text-align: center;"></i> الإتصال بنا
+            </a>
+        </li>
+    </ul>
+</div>
 </body>
 </html>
